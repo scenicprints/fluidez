@@ -1,0 +1,5 @@
+package com.example.fluidez
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()

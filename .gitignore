@@ -1,0 +1,13 @@
+# Flutter / Dart
+shell/.dart_tool/
+shell/.flutter-plugins*
+shell/build/
+shell/android/.gradle/
+shell/android/local.properties
+shell/android/key.properties
+shell/**/*.jks
+shell/**/*.keystore
+shell/ios/Pods/
+.idea/
+*.iml
+.DS_Store
