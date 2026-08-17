@@ -41,10 +41,19 @@ const CK = {
   pack: (code) => `fl:c:pack:${code}`,
 };
 
-async function getJson(url) {
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`${res.status} ${url}`);
-  return res.json();
+// Every request is bounded. On a bad connection a hung fetch is far worse
+// than a failed one: the app has good cached answers and can carry on, but
+// only if it is ever told the network is not coming.
+async function getJson(url, timeoutMs = 20000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+    if (!res.ok) throw new Error(`${res.status} ${url}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function cacheRead(k) {
@@ -82,19 +91,20 @@ export const content = {
   has(feature) { return this.features().includes(feature); },
 };
 
-export async function loadLanguages({ allowNetwork = true } = {}) {
+export async function loadLanguages({ allowNetwork = true, timeoutMs = 6000 } = {}) {
   const cached = cacheRead(CK.languages);
   if (cached) content.languages = cached;
   if (!allowNetwork) return content.languages;
   try {
-    const doc = await getJson(languagesUrl());
+    const doc = await getJson(languagesUrl(), timeoutMs);
     const list = Array.isArray(doc) ? doc : doc.languages;
     if (Array.isArray(list) && list.length) {
       content.languages = list;
       cacheWrite(CK.languages, list);
     }
   } catch {
-    // Offline, or the registry moved. The cached list (or the fallback) stands.
+    // Offline, rate limited, or the registry moved. The cached list — or at
+    // worst the built-in fallback — stands, and the picker still works.
   }
   return content.languages;
 }

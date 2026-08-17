@@ -467,9 +467,12 @@ export function renderWords() {
     .filter((x) => x.m > 0)
     .sort((a, b) => a.m - b.m);
 
+  // These three must add up to the chips below, or the counts look broken.
+  // A word met once sits a hair under .2 the instant it starts decaying, so
+  // "fading" has to mean everything below growing, not a band with a floor.
   const strong = entries.filter((x) => x.m >= 0.8).length;
   const growing = entries.filter((x) => x.m >= 0.5 && x.m < 0.8).length;
-  const fading = entries.filter((x) => x.m >= 0.2 && x.m < 0.5).length;
+  const fading = entries.filter((x) => x.m < 0.5).length;
 
   const stats = el('div', 'stats3');
   stats.innerHTML =
@@ -552,6 +555,9 @@ function finishItem(correct, word) {
   drill.answered++;
   if (correct) drill.correct++;
   if (word) store.recordAnswer(word, correct);
+  // Repaint the score now, not on the next question — otherwise you answer
+  // and the counter still reads 0 / 0.
+  $('drillScore').textContent = `${drill.correct} / ${drill.answered}`;
   activity();
 }
 

@@ -136,14 +136,19 @@ async function afterAuth(isNew, fromCloud = false) {
 // ── language ────────────────────────────────────────────────
 export async function showLanguagePicker({ standalone = false } = {}) {
   showPane('lang');
+
+  // Paint whatever is already known first — the cached registry, or at worst
+  // the built-in fallback. A slow network must never leave this on a spinner.
+  paintLanguages(standalone);
+  await loadLanguages();
+  paintLanguages(standalone);
+}
+
+function paintLanguages(standalone) {
   const list = $('langList');
   clear(list);
-  list.appendChild(el('div', 'spinner'));
-
-  await loadLanguages();
-  clear(list);
-
   const current = store.settings.get('language');
+
   for (const lang of content.languages) {
     const row = el('button', 'langrow' + (lang.code === current ? ' sel' : ''));
     row.type = 'button';

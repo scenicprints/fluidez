@@ -38,8 +38,17 @@ function showUpdateBanner(text, onGo) {
   b.classList.add('show');
 }
 
+const isLocalDev = ['127.0.0.1', 'localhost'].includes(location.hostname);
+
 async function registerWorker() {
   if (!('serviceWorker' in navigator)) return null;
+  // Locally the version never changes, so the worker would serve stale code
+  // forever and hide every edit. Opt in with ?sw=1 to test offline behaviour.
+  if (isLocalDev && !new URLSearchParams(location.search).has('sw')) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.unregister()));
+    return null;
+  }
   try {
     const reg = await navigator.serviceWorker.register('sw.js', { scope: './' });
 
@@ -205,3 +214,9 @@ boot().catch((e) => {
 
 // Expose the session so setup can fill it in after login.
 window.__fluidezSession = session;
+
+// A handle for driving the app from the console while developing. Guarded to
+// localhost so nothing is reachable in the shipped build.
+if (isLocalDev) {
+  window.__fluidez = { screens, store, content, session, showScreen };
+}
