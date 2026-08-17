@@ -72,6 +72,7 @@ jobs:
           set -e
           sed -i "s/__VERSION__/${V}/g; s/__BUILT__/${B}/g; s/__COMMIT__/${S}/g" docs/version.json
           sed -i "s/__VERSION__/${V}/g" docs/sw.js
+          sed -i "s/__VERSION__/${V}/g" docs/js/app.js
           # Cache-bust the assets index.html points at, in the same breath.
           sed -i "s/?v=DEV/?v=${V}/g" docs/index.html
 

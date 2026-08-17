@@ -22,14 +22,17 @@ let momo = null;
 
 const VERSION_URL = 'version.json';
 
-// The version of the code ACTUALLY RUNNING, read from this module's own URL
-// (CI stamps ?v=<version> onto it). version.json reports what the server has,
-// which is a different question — and when a stale worker is serving old
-// JavaScript the two disagree, which is precisely what needs surfacing.
-const RUNNING_VERSION = (() => {
-  try { return new URL(import.meta.url).searchParams.get('v') || 'dev'; }
-  catch { return 'dev'; }
-})();
+// The version of the code ACTUALLY RUNNING, stamped in by CI.
+//
+// This used to be read from import.meta.url, which cannot work: the service
+// worker precaches js/app.js without its query string and serves it with
+// ignoreSearch, so the response URL — and therefore import.meta.url — has no
+// ?v= on it at all. The version must be baked into the file itself.
+//
+// version.json reports what the SERVER has, a different question. When a stale
+// worker is serving old JavaScript the two disagree, which is the point.
+const STAMPED_VERSION = '__VERSION__';
+const RUNNING_VERSION = STAMPED_VERSION.includes('VERSION__') ? 'dev' : STAMPED_VERSION;
 
 let knownVersion = null;
 
