@@ -34,8 +34,31 @@ async function readVersion() {
 function showUpdateBanner(text, onGo) {
   const b = $('banner');
   $('bannerText').textContent = text;
-  $('bannerGo').onclick = onGo;
+  $('bannerGo').onclick = onGo || applyUpdate;
   b.classList.add('show');
+}
+
+/**
+ * Actually take the new version.
+ *
+ * Reloading is NOT enough: a newly installed worker sits in "waiting" while
+ * the old one still controls the page, so a reload just re-serves the old
+ * cached JavaScript — you get an update banner and the same app. The waiting
+ * worker has to be told to take over, and the reload happens on
+ * controllerchange once it has.
+ */
+async function applyUpdate() {
+  $('bannerGo').textContent = 'Updating…';
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    await reg?.update();
+    const waiting = reg?.waiting;
+    if (waiting) {
+      waiting.postMessage({ type: 'SKIP_WAITING' });
+      return;                       // controllerchange reloads us
+    }
+  } catch {}
+  location.reload();
 }
 
 const isLocalDev = ['127.0.0.1', 'localhost'].includes(location.hostname);
@@ -52,15 +75,19 @@ async function registerWorker() {
   try {
     const reg = await navigator.serviceWorker.register('sw.js', { scope: './' });
 
-    // A worker took over mid-session: something newer is already installed.
+    // A newer worker may already be sitting there from a previous visit —
+    // without this it waits forever and the app never actually updates.
+    if (reg.waiting && navigator.serviceWorker.controller) {
+      showUpdateBanner('A new version is ready');
+    }
+    reg.update().catch(() => {});
+
     reg.addEventListener('updatefound', () => {
       const sw = reg.installing;
       if (!sw) return;
       sw.addEventListener('statechange', () => {
         if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-          showUpdateBanner('A new version is ready', () => {
-            sw.postMessage({ type: 'SKIP_WAITING' });
-          });
+          showUpdateBanner('A new version is ready');
         }
       });
     });
@@ -90,7 +117,7 @@ async function pollVersion() {
   if (v.version !== knownVersion) {
     const reg = await navigator.serviceWorker?.getRegistration();
     await reg?.update();
-    showUpdateBanner(`Version ${v.version} is ready`, () => location.reload());
+    showUpdateBanner(`Version ${v.version} is ready`);
   }
 }
 
