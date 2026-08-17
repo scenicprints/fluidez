@@ -438,9 +438,24 @@ button { font-family: inherit; color: inherit; }
  * describe the same journey and should look like it. Rows in one bordered
  * group instead of one card each — forty separate boxes was the noise. */
 #scenesList { padding-top: 2px; }
-#scenesList .phase-h { margin: 20px 0 8px; }
+#scenesList .phase-h { margin: 18px 0 8px; }
 #scenesList .phase-h:first-child { margin-top: 4px; }
+#scenesList .phase-h.closed { margin-bottom: 0; }
 .phase-c { margin-left: auto; font-size: 11px; color: var(--txt3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.phase-c.full { color: var(--jade); }
+
+/* A phase heading is the control that opens it, so it has to be a real button
+ * — but it must still look exactly like the Path's heading, which is a div. */
+.ph-btn {
+  width: 100%; background: none; border: 0; padding: 0; margin-left: 0;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.ph-btn:active .phase-t { color: var(--oro); }
+/* The only cue that a heading opens — quiet, but it has to survive a phone
+ * screen, and at 10px in --txt3 it did not. */
+.phase-v { flex: none; font-size: 12px; color: var(--txt2); margin-left: 10px; transition: transform .2s; }
+.phase-h.closed .phase-v { transform: rotate(-90deg); }
+@media (hover: hover) { .ph-btn:hover .phase-t { color: var(--oro); } }
 
 .scene-g { border: 1px solid var(--linea); border-radius: 16px; overflow: hidden; background: var(--ceniza); }
 .scene-r {

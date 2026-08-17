@@ -485,11 +485,18 @@ function openPhases() {
   return open;
 }
 
+// Which phase is showing its scenes. null means "wherever I am up to", which
+// is what you want every time you arrive; a number means you opened that one
+// yourself. One at a time, so the page cannot grow past a screen or two no
+// matter how far into the course you get.
+let scenePhaseOpen = null;
+
 /**
- * Forty scenes in one flat column of forty cards is a wall, and thirty-five of
- * them were locked. Grouped under the same gold phase headings the Path uses,
- * with a locked phase collapsed to its heading alone, it reads as a short list
- * of where you are and a glance at what is coming.
+ * Forty scenes in one flat column was a wall. Grouped under the same gold
+ * phase headings the Path uses, with every phase but the one you are on
+ * collapsed to a single line, it stays about a screen and a half from your
+ * first day to your last — collapsing only the locked half still let it grow
+ * to five screens by the end, because finished phases stayed open forever.
  */
 export function renderScenes() {
   paintLevel();
@@ -509,23 +516,45 @@ export function renderScenes() {
     if (!byPhase.has(s.phase)) byPhase.set(s.phase, []);
     byPhase.get(s.phase).push(s);
   }
+  const phases = [...byPhase.entries()].sort((a, b) => a[0] - b[0]);
+
+  // Where you are up to: the first phase you can play that still has something
+  // unplayed in it, or failing that the furthest one you have reached.
+  const reached = phases.filter(([p]) => open.has(p));
+  let current = reached.find(([, list]) => list.some((s) => !done.includes(s.id)))?.[0];
+  if (current === undefined) current = reached.length ? reached[reached.length - 1][0] : null;
+  const showing = scenePhaseOpen === null ? current : scenePhaseOpen;
 
   let played = 0;
-  for (const [phase, list] of [...byPhase.entries()].sort((a, b) => a[0] - b[0])) {
+  for (const [phase, list] of phases) {
     const unlocked = open.has(phase);
     const hit = list.filter((s) => done.includes(s.id)).length;
+    const full = hit === list.length;
+    const expanded = unlocked && phase === showing;
     played += hit;
 
-    const head = el('div', 'phase-h' + (unlocked ? '' : ' locked'));
+    const head = el(unlocked ? 'button' : 'div',
+      'phase-h' + (unlocked ? ' ph-btn' : ' locked') + (expanded ? '' : ' closed'));
+    if (unlocked) {
+      head.type = 'button';
+      head.setAttribute('aria-expanded', String(expanded));
+    }
     head.innerHTML =
       `<span class="phase-n">${phase}</span>` +
       `<span class="phase-t">${esc(phaseName(phase))}</span>` +
-      `<span class="phase-c">${unlocked
-        ? `${hit} of ${list.length}`
-        : `🔒 finish phase ${phase - 1}`}</span>`;
+      `<span class="phase-c${full ? ' full' : ''}">${unlocked
+        ? `${hit} of ${list.length}${full ? ' ✓' : ''}`
+        : `🔒 finish phase ${phase - 1}`}</span>` +
+      (unlocked ? '<span class="phase-v">▾</span>' : '');
+    if (unlocked) {
+      head.addEventListener('click', () => {
+        scenePhaseOpen = expanded ? -1 : phase;   // -1 = deliberately all shut
+        renderScenes();
+      });
+    }
     pad.appendChild(head);
 
-    if (!unlocked) continue;          // the heading is the whole row
+    if (!expanded) continue;
 
     const group = el('div', 'scene-g');
     for (const s of list) {
