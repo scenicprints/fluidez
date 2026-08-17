@@ -37,15 +37,31 @@ jobs:
       - name: Test the learning engine
         run: node docs/js/engine.test.mjs
 
+      # Numbers only. The version is embedded in asset URLs, and a "+" in a
+      # query string decodes as a space - which silently broke the app's
+      # "am I up to date?" comparison and left an update banner showing
+      # forever. VERSION holds major.minor; CI appends the run number so every
+      # deploy is unique and increasing.
       - name: Work out the version
         id: v
         run: |
           BASE=$(cat VERSION | tr -d '[:space:]')
+          BUILD=$(printf '%02d' "${GITHUB_RUN_NUMBER}")
           SHA=$(git rev-parse --short HEAD)
-          echo "version=${BASE}+${SHA}" >> "$GITHUB_OUTPUT"
+          echo "version=${BASE}.${BUILD}" >> "$GITHUB_OUTPUT"
           echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
           echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
-          echo "Deploying ${BASE}+${SHA}"
+          echo "Deploying ${BASE}.${BUILD} (${SHA})"
+
+      - name: The version must be safe to put in a URL
+        env:
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          if ! printf '%s' "$V" | grep -qE '^[0-9]+(\.[0-9]+)+$'; then
+            echo "::error::version '$V' is not numeric-only; it would break asset URLs"
+            exit 1
+          fi
+          echo "version $V is URL-safe"
 
       - name: Stamp the version everywhere
         env:

@@ -59,6 +59,21 @@ function showUpdateBanner(text, onGo) {
  */
 async function applyUpdate() {
   $('bannerGo').textContent = 'Updating…';
+
+  // If we cannot tell which version is running, the page itself is stale — a
+  // cached index.html pointing at unstamped assets. Skipping the waiting
+  // worker will not help, so tear the caches down and start clean. Progress
+  // is safe: it lives in local storage and in Firestore, not in these caches.
+  if (RUNNING_VERSION === 'dev') {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    } catch {}
+    return location.replace(location.pathname);
+  }
+
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
     await reg?.update();
@@ -202,10 +217,15 @@ async function boot() {
   knownVersion = v?.version || null;
   window.__FLUIDEZ_VERSION__ = RUNNING_VERSION;
   // On screen, so "it updated but looks the same" is answerable at a glance.
-  const stale = knownVersion && knownVersion !== RUNNING_VERSION;
+  const stale = RUNNING_VERSION === 'dev' || (knownVersion && knownVersion !== RUNNING_VERSION);
+  if (stale) {
+    showUpdateBanner(RUNNING_VERSION === 'dev'
+      ? 'This copy is out of date — tap to repair'
+      : `Version ${knownVersion} is ready`);
+  }
   for (const id of ['splashVer', 'loginVer']) {
     const n = $(id);
-    if (n) n.textContent = stale ? `v${RUNNING_VERSION} — update ready` : `v${RUNNING_VERSION}`;
+    if (n) n.textContent = stale ? `v${RUNNING_VERSION} · update ready` : `v${RUNNING_VERSION}`;
   }
 
   registerWorker();
