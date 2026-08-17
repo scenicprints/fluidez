@@ -97,10 +97,6 @@ button { font-family: inherit; color: inherit; }
 .card { background: var(--ceniza); border: 1px solid var(--linea); border-radius: 17px; padding: 15px; }
 .card.tap { cursor: pointer; transition: transform .12s, border-color .16s, background .16s; }
 .card.tap:active { transform: scale(.982); border-color: var(--oro-d); background: var(--ceniza2); }
-/* Matches .node.lock on the Path, so a locked scene reads the same as a
- * locked lesson rather than inventing a second visual language for it. */
-.card.lock { opacity: .42; cursor: default; }
-.card.lock .cont-title { font-family: var(--sans); font-size: 15px; color: var(--txt3); }
 
 .go {
   width: 100%; padding: 14px; border-radius: 12px; border: 0; cursor: pointer;
@@ -436,6 +432,31 @@ button { font-family: inherit; color: inherit; }
 .node-d { font-size: 11px; color: var(--txt3); margin-top: 2px; display: block; }
 .node.now .node-d { color: var(--oro); }
 .mini-momo { position: absolute; right: 4px; top: 50%; transform: translateY(-52%); width: 36px; z-index: 3; pointer-events: none; }
+
+/* ── scenes ────────────────────────────────────────────── */
+/* Deliberately the Path's phase headings, not a second set: the two screens
+ * describe the same journey and should look like it. Rows in one bordered
+ * group instead of one card each — forty separate boxes was the noise. */
+#scenesList { padding-top: 2px; }
+#scenesList .phase-h { margin: 20px 0 8px; }
+#scenesList .phase-h:first-child { margin-top: 4px; }
+.phase-c { margin-left: auto; font-size: 11px; color: var(--txt3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.scene-g { border: 1px solid var(--linea); border-radius: 16px; overflow: hidden; background: var(--ceniza); }
+.scene-r {
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  background: none; border: 0; padding: 13px 15px; cursor: pointer; color: inherit;
+  transition: background .14s;
+}
+.scene-r + .scene-r { border-top: 1px solid var(--linea); }
+.scene-r:active { background: var(--ceniza2); }
+.scene-x { width: 15px; flex: none; color: var(--jade); font-size: 13px; line-height: 1; }
+/* Both of these must be display:block or the title and its line run together. */
+.scene-b { min-width: 0; }
+.scene-t { font-family: var(--serif); font-size: 17px; line-height: 1.22; display: block; }
+.scene-d { font-size: 11.5px; color: var(--txt3); margin-top: 2px; display: block; }
+.scene-r.played .scene-t { color: var(--txt2); }
+@media (hover: hover) { .scene-r:hover { background: var(--ceniza2); } }
 
 /* ── reader (paper) ────────────────────────────────────── */
 .paper { background: var(--papel); color: var(--tinta); flex: 1; display: flex; flex-direction: column; min-height: 0; }

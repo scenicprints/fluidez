@@ -485,32 +485,64 @@ function openPhases() {
   return open;
 }
 
+/**
+ * Forty scenes in one flat column of forty cards is a wall, and thirty-five of
+ * them were locked. Grouped under the same gold phase headings the Path uses,
+ * with a locked phase collapsed to its heading alone, it reads as a short list
+ * of where you are and a glance at what is coming.
+ */
 export function renderScenes() {
   paintLevel();
   const done = store.progress.all().scenariosDone || [];
-  $('scenesSub').textContent = `${done.length} of ${content.scenarios.length} played`;
   const pad = $('scenesList');
   clear(pad);
   if (!content.scenarios.length) {
     pad.innerHTML = '<p class="empty">This course has no scenes.</p>';
+    $('scenesSub').textContent = '';
     return;
   }
 
-  // Scenes were entirely ungated — every one of the forty was playable on day
-  // one, including phase 7, while the Path beside it was still locked at
-  // phase 1. A scene is the phase's payoff; you have to get there first.
+  // A scene is the phase's payoff; you have to get there first.
   const open = openPhases();
+  const byPhase = new Map();
   for (const s of content.scenarios) {
-    const locked = !open.has(s.phase);
-    const c = el('div', 'card' + (locked ? ' lock' : ' tap'));
-    c.innerHTML =
-      `<p class="label">${locked ? '🔒 ' : ''}Phase ${s.phase} · ${esc(phaseName(s.phase))}` +
-      `${!locked && done.includes(s.id) ? ' · played' : ''}</p>` +
-      `<div class="cont-title es" style="font-size:19px">${esc(s.title)}</div>` +
-      `<div class="sub">${locked ? `Opens when you finish phase ${s.phase - 1}` : esc(s.desc)}</div>`;
-    if (!locked) c.addEventListener('click', () => openScene(s));
-    pad.appendChild(c);
+    if (!byPhase.has(s.phase)) byPhase.set(s.phase, []);
+    byPhase.get(s.phase).push(s);
   }
+
+  let played = 0;
+  for (const [phase, list] of [...byPhase.entries()].sort((a, b) => a[0] - b[0])) {
+    const unlocked = open.has(phase);
+    const hit = list.filter((s) => done.includes(s.id)).length;
+    played += hit;
+
+    const head = el('div', 'phase-h' + (unlocked ? '' : ' locked'));
+    head.innerHTML =
+      `<span class="phase-n">${phase}</span>` +
+      `<span class="phase-t">${esc(phaseName(phase))}</span>` +
+      `<span class="phase-c">${unlocked
+        ? `${hit} of ${list.length}`
+        : `🔒 finish phase ${phase - 1}`}</span>`;
+    pad.appendChild(head);
+
+    if (!unlocked) continue;          // the heading is the whole row
+
+    const group = el('div', 'scene-g');
+    for (const s of list) {
+      const isDone = done.includes(s.id);
+      const row = el('button', 'scene-r' + (isDone ? ' played' : ''));
+      row.type = 'button';
+      row.innerHTML =
+        `<span class="scene-x">${isDone ? '✓' : ''}</span>` +
+        `<span class="scene-b"><span class="scene-t es">${esc(s.title)}</span>` +
+        `<span class="scene-d">${esc(s.desc)}</span></span>`;
+      row.addEventListener('click', () => openScene(s));
+      group.appendChild(row);
+    }
+    pad.appendChild(group);
+  }
+
+  $('scenesSub').textContent = `${played} of ${content.scenarios.length} played`;
 }
 
 let scene = null;
