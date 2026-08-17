@@ -1,0 +1,100 @@
+name: Deploy
+
+# Push to main and everyone has it. One version number is computed here and
+# stamped into every file that needs it — the service worker, version.json and
+# the asset URLs in index.html — so a cache bump can never be half-applied.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'VERSION'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # The engine is the part where a silent mistake would quietly corrupt
+      # everybody's progress, so a broken one must never reach Pages.
+      - name: Test the learning engine
+        run: node docs/js/engine.test.mjs
+
+      - name: Work out the version
+        id: v
+        run: |
+          BASE=$(cat VERSION | tr -d '[:space:]')
+          SHA=$(git rev-parse --short HEAD)
+          echo "version=${BASE}+${SHA}" >> "$GITHUB_OUTPUT"
+          echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "Deploying ${BASE}+${SHA}"
+
+      - name: Stamp the version everywhere
+        env:
+          V: ${{ steps.v.outputs.version }}
+          B: ${{ steps.v.outputs.built }}
+          S: ${{ steps.v.outputs.sha }}
+        run: |
+          set -e
+          sed -i "s/__VERSION__/${V}/g; s/__BUILT__/${B}/g; s/__COMMIT__/${S}/g" docs/version.json
+          sed -i "s/__VERSION__/${V}/g" docs/sw.js
+          # Cache-bust the assets index.html points at, in the same breath.
+          sed -i "s/?v=DEV/?v=${V}/g" docs/index.html
+
+          echo "--- version.json"; cat docs/version.json
+          echo "--- checks"
+          if grep -rn "__VERSION__" docs/; then echo "::error::a __VERSION__ placeholder survived"; exit 1; fi
+          if grep -n "?v=DEV" docs/index.html; then echo "::error::an unstamped asset URL survived"; exit 1; fi
+
+      - name: Check nothing references a missing file
+        run: |
+          set -e
+          cd docs
+          fail=0
+          # Everything the service worker claims to precache must actually exist.
+          for f in $(grep -oP "(?<=')\./[^']+(?=')" sw.js | sed "s|^\./||" | grep -v '^$'); do
+            if [ "$f" != "" ] && [ ! -e "$f" ] && [ "$f" != "/" ]; then
+              echo "::error::sw.js precaches missing file: $f"; fail=1
+            fi
+          done
+          # Every module the app imports must exist too.
+          for f in js/*.js; do
+            for imp in $(grep -oP "(?<=from ')\./[^']+(?=')" "$f" || true); do
+              t="js/${imp#./}"
+              [ -e "$t" ] || { echo "::error::$f imports missing $t"; fail=1; }
+            done
+          done
+          exit $fail
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

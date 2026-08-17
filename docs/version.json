@@ -1,0 +1,5 @@
+{
+  "version": "__VERSION__",
+  "built": "__BUILT__",
+  "commit": "__COMMIT__"
+}

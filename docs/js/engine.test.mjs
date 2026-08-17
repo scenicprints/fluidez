@@ -1,0 +1,275 @@
+// Checks the JS engine against values computed by hand from the original
+// Dart, so a fluency score means the same thing after the move.
+//
+//   node docs/js/engine.test.mjs
+
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import {
+  memoryStrength, band, tokenize, cleanWord, conjugate, calcFluency,
+  fadingWords, leeches, gradeTyped, normalizeAnswer, orderCandidates,
+  scramble, generateExercises, phaseName,
+} from './engine.js';
+
+let passed = 0;
+const test = (name, fn) => {
+  try { fn(); passed++; }
+  catch (e) { console.error(`FAIL  ${name}\n      ${e.message}`); process.exitCode = 1; }
+};
+
+const HOUR = 3600000;
+const NOW = 1_700_000_000_000;
+
+// ── decay ───────────────────────────────────────────────────
+test('unseen words have no strength', () => {
+  assert.equal(memoryStrength(0, NOW, NOW), 0);
+});
+
+test('one exposure is capped at 1/5 even when brand new', () => {
+  // min(1, 1/5) = 0.2, times 2^0 = 1
+  assert.equal(memoryStrength(1, NOW, NOW).toFixed(4), '0.2000');
+});
+
+test('five exposures at zero elapsed time is full strength', () => {
+  assert.equal(memoryStrength(5, NOW, NOW), 1);
+});
+
+test('one exposure halves after exactly one half-life (24h)', () => {
+  assert.equal(memoryStrength(1, NOW - 24 * HOUR, NOW).toFixed(4), '0.1000');
+});
+
+test('the half-life stretches with sqrt(exposures)', () => {
+  // 4 exposures -> half-life 48h. After 48h: min(1,4/5)=0.8, halved = 0.4
+  assert.equal(memoryStrength(4, NOW - 48 * HOUR, NOW).toFixed(4), '0.4000');
+});
+
+test('strength stays inside 0..1 and decays to nothing', () => {
+  // Exponential decay never reaches exactly zero — matching the Dart — but it
+  // gets far below any threshold the app cares about.
+  const ancient = memoryStrength(9, NOW - 10000 * HOUR, NOW);
+  assert.ok(ancient >= 0 && ancient < 1e-9, `expected ~0, got ${ancient}`);
+  assert.ok(band(ancient).key === 'new');
+  assert.ok(memoryStrength(50, NOW, NOW) <= 1);
+});
+
+// ── bands ───────────────────────────────────────────────────
+test('band boundaries sit exactly where the Dart put them', () => {
+  assert.equal(band(0.8).key, 'strong');
+  assert.equal(band(0.79).key, 'growing');
+  assert.equal(band(0.5).key, 'growing');
+  assert.equal(band(0.49).key, 'fading');
+  assert.equal(band(0.2).key, 'fading');
+  assert.equal(band(0.19).key, 'new');
+});
+
+// ── text ────────────────────────────────────────────────────
+test('cleanWord strips Spanish punctuation but keeps accents', () => {
+  assert.equal(cleanWord('¿Cómo?'), 'cómo');
+  assert.equal(cleanWord('"Ideay!"'), 'ideay');
+});
+
+test('tokenize keeps punctuation as its own non-word token', () => {
+  const t = tokenize('Hola, vos');
+  assert.deepEqual(t.map((x) => x.raw), ['Hola', ', ', 'vos']);
+  assert.deepEqual(t.map((x) => x.isWord), [true, false, true]);
+});
+
+test('tokenize is reentrant — a global regex must not carry lastIndex', () => {
+  assert.equal(tokenize('uno dos').length, tokenize('uno dos').length);
+});
+
+// ── conjugation ─────────────────────────────────────────────
+const verbs = JSON.parse(readFileSync(new URL('../../build/verbs.json', import.meta.url)));
+
+test('verbs.json carries the voseo forms', () => {
+  assert.equal(verbs.subjects[1], 'vos');
+  assert.equal(verbs.irregular.poder.present[1], 'podés');
+});
+
+test('irregular verbs come straight from the table', () => {
+  assert.equal(conjugate(verbs, 'ser', 'present', 1), 'sos');
+  assert.equal(conjugate(verbs, 'tener', 'present', 1), 'tenés');
+  assert.equal(conjugate(verbs, 'ir', 'past', 0), 'fui');
+});
+
+test('regular verbs take the voseo ending on the stem', () => {
+  assert.equal(conjugate(verbs, 'hablar', 'present', 1), 'hablás');
+  assert.equal(conjugate(verbs, 'comer', 'present', 1), 'comés');
+  assert.equal(conjugate(verbs, 'vivir', 'present', 1), 'vivís');
+});
+
+test('future tense builds on the infinitive, not the stem', () => {
+  assert.equal(conjugate(verbs, 'hablar', 'future', 0), 'hablaré');
+  assert.equal(conjugate(verbs, 'comer', 'future', 4), 'comerán');
+  assert.equal(conjugate(verbs, 'vivir', 'future', 1), 'vivirás');
+});
+
+test('every drillable verb conjugates in every tense without blowing up', () => {
+  for (const v of verbs.drill) {
+    for (const t of verbs.tenses) {
+      for (let s = 0; s < verbs.subjects.length; s++) {
+        const form = conjugate(verbs, v, t, s);
+        assert.ok(form && typeof form === 'string' && form.length > 1, `${v}/${t}/${s} -> ${form}`);
+      }
+    }
+  }
+});
+
+// ── fluency ─────────────────────────────────────────────────
+const totals = { lessons: 81, patterns: 9 };
+
+test('a blank slate is A0 at 0%', () => {
+  const f = calcFluency({}, {}, [], totals);
+  assert.equal(f.overall, 0);
+  assert.equal(f.level, 'A0');
+  assert.equal(f.known, 0);
+});
+
+test('the five components are weighted .35/.2/.15/.15/.15', () => {
+  // 300 known words alone = vocabScore 1 = 35%
+  const vocab = {};
+  for (let i = 0; i < 300; i++) vocab['w' + i] = { exposures: 5, lastSeen: Date.now() };
+  const f = calcFluency(vocab, {}, [], totals);
+  assert.equal(f.vocabScore, 1);
+  assert.equal(f.overall, 35);
+});
+
+test('a perfect score on everything is 100% and B1', () => {
+  const vocab = {};
+  for (let i = 0; i < 300; i++) vocab['w' + i] = { exposures: 5, lastSeen: Date.now() };
+  const f = calcFluency(
+    vocab,
+    { practiceScore: 10, practiceTotal: 10, storiesRead: Array.from({ length: 81 }, (_, i) => 's' + i), verbsCorrect: 50 },
+    Array.from({ length: 9 }, (_, i) => 'p' + i),
+    totals,
+  );
+  assert.equal(f.overall, 100);
+  assert.equal(f.level, 'B1');
+});
+
+test('milestones fire on the thresholds they claim', () => {
+  const vocab = {};
+  for (let i = 0; i < 50; i++) vocab['w' + i] = { exposures: 5, lastSeen: Date.now() };
+  const f = calcFluency(vocab, {}, [], totals);
+  const titles = f.milestones.map((m) => m.title);
+  assert.ok(titles.includes('First 10 words'));
+  assert.ok(titles.includes('50 words'));
+  assert.ok(!titles.includes('100 words'));
+  assert.equal(f.next[0].title, '100 words');
+});
+
+test('faded words stop counting as known', () => {
+  const old = Date.now() - 5000 * HOUR;
+  const vocab = { uno: { exposures: 1, lastSeen: old } };
+  assert.equal(calcFluency(vocab, {}, [], totals).known, 0);
+});
+
+// ── review queues ───────────────────────────────────────────
+const dict = { uno: { en: 'one', pos: 'num' }, dos: { en: 'two', pos: 'num' }, tres: { en: 'three', pos: 'num' } };
+
+test('fading words come back weakest first', () => {
+  const now = Date.now();
+  const vocab = {
+    uno: { exposures: 5, lastSeen: now },
+    dos: { exposures: 1, lastSeen: now - 20 * HOUR },
+    tres: { exposures: 3, lastSeen: now - 2 * HOUR },
+  };
+  assert.deepEqual(fadingWords(vocab, dict).map((x) => x.word), ['dos', 'tres', 'uno']);
+});
+
+test('words never met are not review candidates', () => {
+  assert.deepEqual(fadingWords({ uno: { exposures: 0, lastSeen: 0 } }, dict), []);
+});
+
+test('leeches are the ones missed more than hit', () => {
+  const vocab = {
+    uno: { misses: 6, hits: 1 },
+    dos: { misses: 5, hits: 9 },   // plenty of misses but mostly right
+    tres: { misses: 1, hits: 0 },  // not enough misses yet
+  };
+  assert.deepEqual(leeches(vocab).map((x) => x.word), ['uno']);
+});
+
+// ── grading ─────────────────────────────────────────────────
+test('typed answers forgive case, accents and punctuation', () => {
+  assert.ok(gradeTyped('como estas', '¿Cómo estás?').correct);
+  assert.ok(gradeTyped('  ¿CÓMO ESTÁS?  ', '¿cómo estás?').correct);
+});
+
+test('the right words in the wrong order is not correct, but says so', () => {
+  const r = gradeTyped('calle la En hay una fritanga', 'En la calle hay una fritanga.');
+  assert.equal(r.correct, false);
+  assert.equal(r.hint, 'Right words, wrong order');
+});
+
+test('a genuinely wrong answer gets no hint', () => {
+  assert.deepEqual(gradeTyped('necesito un taxi', 'quiero comida'), { correct: false, exact: false });
+});
+
+test('normalizeAnswer collapses whitespace', () => {
+  assert.equal(normalizeAnswer('  hola   vos  '), 'hola vos');
+});
+
+// ── word order ──────────────────────────────────────────────
+const lessons = [{
+  id: 's01', title: 'La fritanga', phase: 0,
+  sentences: [
+    { es: 'En la calle hay una fritanga.', en: "On the street there's a fritanga." },
+    { es: 'Un día, un hombre me habla. "Vos no sos de aquí."', en: 'Long one with quotes.' },
+    { es: 'Hola.', en: 'Hi.' },
+  ],
+}];
+
+test('word order only takes short, quote-free sentences', () => {
+  const c = orderCandidates(lessons, ['s01']);
+  assert.equal(c.length, 1);
+  assert.equal(c[0].words.length, 6);
+});
+
+test('word order falls back to all lessons when nothing is read yet', () => {
+  assert.equal(orderCandidates(lessons, []).length, 1);
+});
+
+test('scramble never returns the sentence already in order', () => {
+  const words = ['En', 'la', 'calle'];
+  for (let i = 0; i < 50; i++) {
+    assert.notEqual(scramble(words).join(' '), words.join(' '));
+  }
+});
+
+// ── exercises ───────────────────────────────────────────────
+test('exercise generation always yields something usable', () => {
+  const vocab = { uno: { exposures: 2, lastSeen: Date.now() }, dos: { exposures: 1, lastSeen: Date.now() } };
+  const ex = generateExercises(vocab, dict, lessons, 8);
+  assert.ok(ex.length > 0);
+  for (const e of ex) assert.ok(e.kind && e.correct !== undefined);
+});
+
+test('multiple-choice exercises always include the right answer', () => {
+  const vocab = {};
+  for (const w of Object.keys(dict)) vocab[w] = { exposures: 2, lastSeen: Date.now() };
+  for (const e of generateExercises(vocab, dict, lessons, 20)) {
+    if (e.options) assert.ok(e.options.includes(e.correct), `${e.kind} lost its answer`);
+  }
+});
+
+test('an empty library still produces a fallback rather than crashing', () => {
+  const ex = generateExercises({}, {}, [], 5);
+  assert.equal(ex.length, 1);
+});
+
+test('a language can restrict which exercise kinds it uses', () => {
+  const vocab = {};
+  for (const w of Object.keys(dict)) vocab[w] = { exposures: 2, lastSeen: Date.now() };
+  const ex = generateExercises(vocab, dict, lessons, 10, ['es_en']);
+  assert.ok(ex.every((e) => e.kind === 'es_en'));
+});
+
+// ── phases ──────────────────────────────────────────────────
+test('all eight phases are named', () => {
+  assert.equal(phaseName(0), 'Survival');
+  assert.equal(phaseName(7), 'Native-Like');
+  assert.equal(phaseName(99), 'Phase 99');
+});
+
+console.log(`${passed} passed${process.exitCode ? ', SOME FAILED' : ''}`);

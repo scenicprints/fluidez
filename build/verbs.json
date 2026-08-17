@@ -1,0 +1,617 @@
+{
+  "subjects": [
+    "yo",
+    "vos",
+    "él/ella",
+    "nosotros",
+    "ellos"
+  ],
+  "tenses": [
+    "present",
+    "past",
+    "future"
+  ],
+  "regular": {
+    "ar": {
+      "present": [
+        "o",
+        "ás",
+        "a",
+        "amos",
+        "an"
+      ],
+      "past": [
+        "é",
+        "aste",
+        "ó",
+        "amos",
+        "aron"
+      ],
+      "future": [
+        "aré",
+        "arás",
+        "ará",
+        "aremos",
+        "arán"
+      ]
+    },
+    "er": {
+      "present": [
+        "o",
+        "és",
+        "e",
+        "emos",
+        "en"
+      ],
+      "past": [
+        "í",
+        "iste",
+        "ió",
+        "imos",
+        "ieron"
+      ],
+      "future": [
+        "eré",
+        "erás",
+        "erá",
+        "eremos",
+        "erán"
+      ]
+    },
+    "ir": {
+      "present": [
+        "o",
+        "ís",
+        "e",
+        "imos",
+        "en"
+      ],
+      "past": [
+        "í",
+        "iste",
+        "ió",
+        "imos",
+        "ieron"
+      ],
+      "future": [
+        "iré",
+        "irás",
+        "irá",
+        "iremos",
+        "irán"
+      ]
+    }
+  },
+  "irregular": {
+    "ser": {
+      "present": [
+        "soy",
+        "sos",
+        "es",
+        "somos",
+        "son"
+      ],
+      "past": [
+        "fui",
+        "fuiste",
+        "fue",
+        "fuimos",
+        "fueron"
+      ],
+      "future": [
+        "seré",
+        "serás",
+        "será",
+        "seremos",
+        "serán"
+      ]
+    },
+    "estar": {
+      "present": [
+        "estoy",
+        "estás",
+        "está",
+        "estamos",
+        "están"
+      ],
+      "past": [
+        "estuve",
+        "estuviste",
+        "estuvo",
+        "estuvimos",
+        "estuvieron"
+      ],
+      "future": [
+        "estaré",
+        "estarás",
+        "estará",
+        "estaremos",
+        "estarán"
+      ]
+    },
+    "tener": {
+      "present": [
+        "tengo",
+        "tenés",
+        "tiene",
+        "tenemos",
+        "tienen"
+      ],
+      "past": [
+        "tuve",
+        "tuviste",
+        "tuvo",
+        "tuvimos",
+        "tuvieron"
+      ],
+      "future": [
+        "tendré",
+        "tendrás",
+        "tendrá",
+        "tendremos",
+        "tendrán"
+      ]
+    },
+    "ir": {
+      "present": [
+        "voy",
+        "vas",
+        "va",
+        "vamos",
+        "van"
+      ],
+      "past": [
+        "fui",
+        "fuiste",
+        "fue",
+        "fuimos",
+        "fueron"
+      ],
+      "future": [
+        "iré",
+        "irás",
+        "irá",
+        "iremos",
+        "irán"
+      ]
+    },
+    "hacer": {
+      "present": [
+        "hago",
+        "hacés",
+        "hace",
+        "hacemos",
+        "hacen"
+      ],
+      "past": [
+        "hice",
+        "hiciste",
+        "hizo",
+        "hicimos",
+        "hicieron"
+      ],
+      "future": [
+        "haré",
+        "harás",
+        "hará",
+        "haremos",
+        "harán"
+      ]
+    },
+    "decir": {
+      "present": [
+        "digo",
+        "decís",
+        "dice",
+        "decimos",
+        "dicen"
+      ],
+      "past": [
+        "dije",
+        "dijiste",
+        "dijo",
+        "dijimos",
+        "dijeron"
+      ],
+      "future": [
+        "diré",
+        "dirás",
+        "dirá",
+        "diremos",
+        "dirán"
+      ]
+    },
+    "poder": {
+      "present": [
+        "puedo",
+        "podés",
+        "puede",
+        "podemos",
+        "pueden"
+      ],
+      "past": [
+        "pude",
+        "pudiste",
+        "pudo",
+        "pudimos",
+        "pudieron"
+      ],
+      "future": [
+        "podré",
+        "podrás",
+        "podrá",
+        "podremos",
+        "podrán"
+      ]
+    },
+    "querer": {
+      "present": [
+        "quiero",
+        "querés",
+        "quiere",
+        "queremos",
+        "quieren"
+      ],
+      "past": [
+        "quise",
+        "quisiste",
+        "quiso",
+        "quisimos",
+        "quisieron"
+      ],
+      "future": [
+        "querré",
+        "querrás",
+        "querrá",
+        "querremos",
+        "querrán"
+      ]
+    },
+    "saber": {
+      "present": [
+        "sé",
+        "sabés",
+        "sabe",
+        "sabemos",
+        "saben"
+      ],
+      "past": [
+        "supe",
+        "supiste",
+        "supo",
+        "supimos",
+        "supieron"
+      ],
+      "future": [
+        "sabré",
+        "sabrás",
+        "sabrá",
+        "sabremos",
+        "sabrán"
+      ]
+    },
+    "dar": {
+      "present": [
+        "doy",
+        "das",
+        "da",
+        "damos",
+        "dan"
+      ],
+      "past": [
+        "di",
+        "diste",
+        "dio",
+        "dimos",
+        "dieron"
+      ],
+      "future": [
+        "daré",
+        "darás",
+        "dará",
+        "daremos",
+        "darán"
+      ]
+    },
+    "ver": {
+      "present": [
+        "veo",
+        "ves",
+        "ve",
+        "vemos",
+        "ven"
+      ],
+      "past": [
+        "vi",
+        "viste",
+        "vio",
+        "vimos",
+        "vieron"
+      ],
+      "future": [
+        "veré",
+        "verás",
+        "verá",
+        "veremos",
+        "verán"
+      ]
+    },
+    "venir": {
+      "present": [
+        "vengo",
+        "venís",
+        "viene",
+        "venimos",
+        "vienen"
+      ],
+      "past": [
+        "vine",
+        "viniste",
+        "vino",
+        "vinimos",
+        "vinieron"
+      ],
+      "future": [
+        "vendré",
+        "vendrás",
+        "vendrá",
+        "vendremos",
+        "vendrán"
+      ]
+    },
+    "poner": {
+      "present": [
+        "pongo",
+        "ponés",
+        "pone",
+        "ponemos",
+        "ponen"
+      ],
+      "past": [
+        "puse",
+        "pusiste",
+        "puso",
+        "pusimos",
+        "pusieron"
+      ],
+      "future": [
+        "pondré",
+        "pondrás",
+        "pondrá",
+        "pondremos",
+        "pondrán"
+      ]
+    },
+    "salir": {
+      "present": [
+        "salgo",
+        "salís",
+        "sale",
+        "salimos",
+        "salen"
+      ],
+      "past": [
+        "salí",
+        "saliste",
+        "salió",
+        "salimos",
+        "salieron"
+      ],
+      "future": [
+        "saldré",
+        "saldrás",
+        "saldrá",
+        "saldremos",
+        "saldrán"
+      ]
+    },
+    "dormir": {
+      "present": [
+        "duermo",
+        "dormís",
+        "duerme",
+        "dormimos",
+        "duermen"
+      ],
+      "past": [
+        "dormí",
+        "dormiste",
+        "durmió",
+        "dormimos",
+        "durmieron"
+      ],
+      "future": [
+        "dormiré",
+        "dormirás",
+        "dormirá",
+        "dormiremos",
+        "dormirán"
+      ]
+    },
+    "pedir": {
+      "present": [
+        "pido",
+        "pedís",
+        "pide",
+        "pedimos",
+        "piden"
+      ],
+      "past": [
+        "pedí",
+        "pediste",
+        "pidió",
+        "pedimos",
+        "pidieron"
+      ],
+      "future": [
+        "pediré",
+        "pedirás",
+        "pedirá",
+        "pediremos",
+        "pedirán"
+      ]
+    },
+    "seguir": {
+      "present": [
+        "sigo",
+        "seguís",
+        "sigue",
+        "seguimos",
+        "siguen"
+      ],
+      "past": [
+        "seguí",
+        "seguiste",
+        "siguió",
+        "seguimos",
+        "siguieron"
+      ],
+      "future": [
+        "seguiré",
+        "seguirás",
+        "seguirá",
+        "seguiremos",
+        "seguirán"
+      ]
+    },
+    "sentir": {
+      "present": [
+        "siento",
+        "sentís",
+        "siente",
+        "sentimos",
+        "sienten"
+      ],
+      "past": [
+        "sentí",
+        "sentiste",
+        "sintió",
+        "sentimos",
+        "sintieron"
+      ],
+      "future": [
+        "sentiré",
+        "sentirás",
+        "sentirá",
+        "sentiremos",
+        "sentirán"
+      ]
+    },
+    "pensar": {
+      "present": [
+        "pienso",
+        "pensás",
+        "piensa",
+        "pensamos",
+        "piensan"
+      ],
+      "past": [
+        "pensé",
+        "pensaste",
+        "pensó",
+        "pensamos",
+        "pensaron"
+      ],
+      "future": [
+        "pensaré",
+        "pensarás",
+        "pensará",
+        "pensaremos",
+        "pensarán"
+      ]
+    },
+    "encontrar": {
+      "present": [
+        "encuentro",
+        "encontrás",
+        "encuentra",
+        "encontramos",
+        "encuentran"
+      ],
+      "past": [
+        "encontré",
+        "encontraste",
+        "encontró",
+        "encontramos",
+        "encontraron"
+      ],
+      "future": [
+        "encontraré",
+        "encontrarás",
+        "encontrará",
+        "encontraremos",
+        "encontrarán"
+      ]
+    },
+    "empezar": {
+      "present": [
+        "empiezo",
+        "empezás",
+        "empieza",
+        "empezamos",
+        "empiezan"
+      ],
+      "past": [
+        "empecé",
+        "empezaste",
+        "empezó",
+        "empezamos",
+        "empezaron"
+      ],
+      "future": [
+        "empezaré",
+        "empezarás",
+        "empezará",
+        "empezaremos",
+        "empezarán"
+      ]
+    }
+  },
+  "drill": [
+    "hablar",
+    "comer",
+    "vivir",
+    "ser",
+    "estar",
+    "tener",
+    "ir",
+    "hacer",
+    "decir",
+    "poder",
+    "querer",
+    "saber",
+    "dar",
+    "ver",
+    "venir",
+    "poner",
+    "salir",
+    "dormir",
+    "pedir",
+    "sentir",
+    "pensar",
+    "encontrar",
+    "empezar",
+    "seguir",
+    "trabajar",
+    "estudiar",
+    "comprar",
+    "necesitar",
+    "buscar",
+    "llamar",
+    "llegar",
+    "tomar",
+    "ayudar",
+    "caminar",
+    "correr",
+    "abrir",
+    "cerrar",
+    "esperar",
+    "explicar",
+    "enseñar",
+    "usar",
+    "cambiar",
+    "terminar",
+    "ganar",
+    "perder"
+  ]
+}
