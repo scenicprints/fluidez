@@ -79,14 +79,55 @@ async function applyUpdate() {
 
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
-    await reg?.update();
-    const waiting = reg?.waiting;
-    if (waiting) {
-      waiting.postMessage({ type: 'SKIP_WAITING' });
-      return;                       // controllerchange reloads us
+    if (reg) {
+      await reg.update();
+
+      // reg.update() resolves once the update job is queued, NOT once the new
+      // worker is ready to take over. The usual state right here is
+      // `installing`, so reading reg.waiting finds nothing, and falling
+      // through to a reload just re-serves the old cached JavaScript from the
+      // worker still in charge — the banner comes back and the button looks
+      // broken. Wait for the new worker to finish installing first.
+      const fresh = reg.waiting || reg.installing;
+      if (fresh && fresh.state !== 'installed') await settled(fresh, 10000);
+      const ready = reg.waiting || (fresh?.state === 'installed' ? fresh : null);
+      if (ready) {
+        ready.postMessage({ type: 'SKIP_WAITING' });
+        return;                     // controllerchange reloads us
+      }
     }
   } catch {}
+
+  // Nothing to hand over to, yet we know we are behind. Rather than reload
+  // into the same stale worker forever, tear it down and start clean. Progress
+  // lives in local storage and Firestore, never in these caches.
+  if (knownVersion && knownVersion !== RUNNING_VERSION) return hardRepair();
   location.reload();
+}
+
+/** Resolve when a worker stops installing, or when we have waited long enough. */
+function settled(worker, ms) {
+  return new Promise((resolve) => {
+    const done = () => {
+      if (worker.state === 'installed' || worker.state === 'activated' || worker.state === 'redundant') {
+        worker.removeEventListener('statechange', done);
+        resolve();
+      }
+    };
+    worker.addEventListener('statechange', done);
+    setTimeout(() => { worker.removeEventListener('statechange', done); resolve(); }, ms);
+  });
+}
+
+/** Unregister everything and drop every cache, then reload from the network. */
+async function hardRepair() {
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.unregister()));
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  } catch {}
+  location.replace(location.pathname);
 }
 
 const isLocalDev = ['127.0.0.1', 'localhost'].includes(location.hostname);
