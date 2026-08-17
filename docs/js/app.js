@@ -185,10 +185,10 @@ function launch(account, { celebrate = false } = {}) {
   }
   if (!momo) {
     $('momo').innerHTML = momoSvg('home');
-    momo = createMomo($('momo'), $('speech'), $('sparks'));
+    momo = createMomo($('momo'), $('speech'), $('sparks'), screens.momoHooks);
   }
   enterApp();
-  if (celebrate) momo.set('cheer', '¡Vamos!');
+  if (celebrate) momo.speak('welcome');
 }
 
 function enterApp() {
@@ -286,5 +286,8 @@ window.__fluidezSession = session;
 // A handle for driving the app from the console while developing. Guarded to
 // localhost so nothing is reachable in the shipped build.
 if (isLocalDev) {
-  window.__fluidez = { screens, store, content, session, showScreen };
+  // momo is a getter because it does not exist until launch(), and the
+  // ambient behaviours (flight, the comeback greeting, time of day) are
+  // otherwise unobservable without waiting minutes or changing the clock.
+  window.__fluidez = { screens, store, content, session, showScreen, get momo() { return momo; } };
 }

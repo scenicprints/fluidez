@@ -9,6 +9,9 @@
 // head — silently painted nothing. Animation hooks are classes for the same
 // reason: an id can only ever drive one of them.
 
+import { content } from './content.js';
+import * as store from './store.js';
+
 export function momoSvg(uid = 'a') {
   const g = (name) => `${name}-${uid}`;
   return `
@@ -105,17 +108,206 @@ export const MOMO_MINI = `
 </svg>`;
 
 const IDLE_AFTER_MS = 45000;
+const STRETCH_BEFORE_MS = 9000;    // yawn this long before actually dozing off
+const BEAT_MIN_MS = 12000;         // a small idle movement every 12–20s
+const BEAT_MAX_MS = 20000;
+const IDLE_BEATS = ['preen', 'flick', 'sidehop'];
+const LONG_PRESS_MS = 550;
+const FLY_OFF_MS = 1000;           // leaving
+const AWAY_MS = 2600;              // the branch is genuinely empty for this long
+const FLY_IN_MS = 1150;            // coming back
+const FLY_CHANCE = 0.14;           // of any given idle beat — rare on purpose
+const LONG_ABSENCE_DAYS = 7;       // gone this long and the perch is empty when you return
 
-export function createMomo(hostEl, speechEl, sparksEl) {
+// Time of day, in the learner's own clock. Night makes him drowsy and slow,
+// morning makes him quick; the middle of the day is the baseline he has
+// always had. Opening the app at 11pm should not feel like opening it at 7am.
+export function partOfDay(now = new Date()) {
+  const h = now.getHours();
+  if (h >= 5 && h < 11) return 'morning';
+  if (h >= 21 || h < 5) return 'night';
+  return 'day';
+}
+
+/** Whole days between two YYYY-MM-DD stamps. */
+export function daysBetween(stamp, now = new Date()) {
+  if (!stamp) return 0;
+  const then = new Date(`${stamp}T00:00:00`);
+  if (Number.isNaN(then.getTime())) return 0;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.max(0, Math.round((today - then) / 86400000));
+}
+
+// ── what he is allowed to say ───────────────────────────────
+// Momo's lines live in the language pack, gated on vocabulary you have
+// actually met — so he only ever speaks words you would understand, and he
+// grows more idiomatic exactly as you do. He used to be hard-coded Nicaraguan
+// Spanish at full slang, which meant the Luzerndütsch course had a bird
+// shouting "¡Qué tuani!" at it, and a day-one beginner was greeted in phase-5
+// street slang.
+//
+// These built-in lines are the floor, used only when a pack ships none. They
+// are English on purpose: a language added to the registry tomorrow gets a
+// mascot who says nothing wrong, rather than one who reverts to Spanish.
+const DEFAULT_LINES = [
+  { id: 'd-welcome', when: 'welcome', state: 'happy', say: "Let's go" },
+  { id: 'd-back',    when: 'back',    state: 'cheer', say: "You're back!" },
+  { id: 'd-poke1',   when: 'poke',    state: 'happy', say: 'Hey — how goes it?' },
+  { id: 'd-poke2',   when: 'poke',    state: 'speak', say: 'Say it out loud' },
+  { id: 'd-poke3',   when: 'poke',    state: 'happy', say: 'Go on then' },
+  { id: 'd-great',   when: 'great',   state: 'cheer', say: 'Nicely done' },
+  { id: 'd-ok',      when: 'ok',      state: 'happy', say: 'Not bad' },
+  { id: 'd-poor',    when: 'poor',    state: 'wrong', say: 'Again?' },
+  { id: 'd-goal',    when: 'goal',    state: 'cheer', say: 'Goal met!' },
+  { id: 'd-pattern', when: 'pattern', state: 'cheer', say: 'New pattern!' },
+  { id: 'd-sleep',   when: 'sleep',   state: 'sleep', say: 'Zzz… tap me' },
+];
+
+const allLines = () => (content.momo && content.momo.length ? content.momo : DEFAULT_LINES);
+
+// Lower-cased because the two paths that record a word disagree: the reader
+// stores cleanWord(...) ("grüezi") while the warm-up stores the raw headword
+// ("Grüezi"). Matching either way means a line unlocks whichever way you met
+// the word.
+function metWords() {
+  const v = store.vocab.all();
+  const met = new Set();
+  for (const w of Object.keys(v)) {
+    if ((v[w]?.exposures || 0) >= 1) met.add(w.toLowerCase());
+  }
+  return met;
+}
+
+// Same trigger/min semantics as patterns: you need `min` of the trigger words.
+function isEarned(line, met) {
+  const trigger = line.trigger || [];
+  if (!trigger.length) return true;
+  const min = line.min == null ? 1 : line.min;
+  return trigger.filter((w) => met.has(String(w).toLowerCase())).length >= min;
+}
+
+/** Every line for a moment that the learner has earned. */
+export function earnedLines(when) {
+  const met = metWords();
+  return allLines().filter((l) => l.when === when && isEarned(l, met));
+}
+
+/**
+ * Pick what he says. A line he has never been able to say before wins, so the
+ * moment you meet the word that unlocks it, that is the line you hear — him
+ * learning alongside you rather than shuffling a fixed deck.
+ */
+export function pickLine(when) {
+  const pool = earnedLines(when);
+  if (!pool.length) return null;
+  const heard = store.momoLines.heard();
+  const fresh = pool.filter((l) => l.id && !heard.includes(l.id));
+  const chosen = fresh.length
+    ? fresh[fresh.length - 1]
+    : pool[Math.floor(Math.random() * pool.length)];
+  if (chosen.id) store.momoLines.learn(chosen.id);
+  return { ...chosen, isNew: fresh.length > 0 };
+}
+
+
+/**
+ * Bring a Momo to life inside `hostEl`.
+ *
+ * `ambient` must be false for any Momo that is not the one on Today. Each
+ * ambient instance arms its own sleep timer and listens on `document` for
+ * activity, so two of them race: whichever fires last wins, both re-arm on
+ * every tap anywhere, and the off-screen one falls asleep on its own schedule.
+ * The wrap-up bird only ever reacts to a score, so it takes ambient: false.
+ */
+export function createMomo(hostEl, speechEl, sparksEl,
+  { ambient = true, poke = true, onLongPress = null, onPoke = null } = {}) {
   let revert = null;
   let hush = null;
   let idle = null;
+  let stretch = null;
+  let beat = null;
+  let flight = null;
+  let flying = false;
+
+  const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const asleep = () => hostEl.classList.contains('sleep');
+
+  // The time of day is a lasting property of the bird, not a reaction, so it
+  // has to survive set() — which rebuilds className from scratch every time.
+  // Everything that clears state goes back to base(), never to 'momo'.
+  const base = () => `momo ${partOfDay()}`;
+  const resting = () => hostEl.className === base();
+
+  function toRest() { hostEl.className = base(); }
 
   function armIdle() {
+    if (!ambient || flying) return;
     clearTimeout(idle);
-    idle = setTimeout(() => {
-      if (!hostEl.classList.contains('sleep')) set('sleep', 'Zzz… tap me');
-    }, IDLE_AFTER_MS);
+    clearTimeout(stretch);
+    // A stretch and a yawn first, so nodding off reads as getting sleepy
+    // rather than cutting to a different picture.
+    const sleepAfter = IDLE_AFTER_MS * (partOfDay() === 'night' ? 0.55 : partOfDay() === 'morning' ? 1.5 : 1);
+    stretch = setTimeout(() => { if (!asleep() && resting()) flash('stretch', 1600); },
+      Math.max(2000, sleepAfter - STRETCH_BEFORE_MS));
+    idle = setTimeout(() => { if (!asleep()) speak('sleep'); }, sleepAfter);
+    armBeat();
+  }
+
+  // The tail swinging on a fixed loop forever is what made him read as a
+  // metronome. A random small beat now and then is most of what makes him
+  // look alive, and it costs nothing but a class.
+  function armBeat() {
+    if (!ambient || reduced()) return;
+    clearTimeout(beat);
+    // Livelier in the morning, sluggish at night.
+    const pace = partOfDay() === 'night' ? 1.6 : partOfDay() === 'morning' ? 0.75 : 1;
+    beat = setTimeout(() => {
+      if (!asleep() && resting()) {
+        // Now and then he simply leaves. Rare on purpose: it is a surprise the
+        // first few times and an irritation if it happens every minute.
+        if (Math.random() < FLY_CHANCE) flyAway();
+        else flash(IDLE_BEATS[Math.floor(Math.random() * IDLE_BEATS.length)], 1200);
+      }
+      armBeat();
+    }, (BEAT_MIN_MS + Math.random() * (BEAT_MAX_MS - BEAT_MIN_MS)) * pace);
+  }
+
+  /**
+   * Off the branch, gone a few seconds, back again.
+   *
+   * The return is scheduled as one chain from the moment he leaves, so there
+   * is no path where the branch stays empty — an empty perch with no bird is
+   * the one outcome that would read as broken rather than alive.
+   */
+  function flyAway(awayMs = AWAY_MS) {
+    if (reduced() || flying || !ambient) return;
+    flying = true;
+    clearTimeout(idle); clearTimeout(stretch); clearTimeout(flight);
+    hostEl.className = `${base()} flyoff`;
+    flight = setTimeout(() => {
+      hostEl.className = `${base()} flyin`;
+      flight = setTimeout(() => { flying = false; toRest(); armIdle(); }, FLY_IN_MS);
+    }, FLY_OFF_MS + awayMs);
+  }
+
+  /** Arrive from off-screen — for when you have been away and the perch is bare. */
+  function flyIn(msg = null) {
+    clearTimeout(flight);
+    if (reduced()) { flying = false; toRest(); if (msg) speak(msg); armIdle(); return; }
+    flying = true;
+    hostEl.className = `${base()} flyin`;
+    flight = setTimeout(() => {
+      flying = false;
+      toRest();
+      if (msg) speak(msg);
+      armIdle();
+    }, FLY_IN_MS);
+  }
+
+  function flash(name, ms) {
+    if (reduced()) return;
+    hostEl.classList.add(name);
+    setTimeout(() => hostEl.classList.remove(name), ms);
   }
 
   function burst(n) {
@@ -137,51 +329,105 @@ export function createMomo(hostEl, speechEl, sparksEl) {
     }
   }
 
-  function say(msg, ms = 2400) {
+  function say(msg, ms = 2400, isNew = false) {
     if (!speechEl || !msg) return;
     speechEl.innerHTML = msg;
     speechEl.classList.add('show');
+    speechEl.classList.toggle('fresh', !!isNew);
     clearTimeout(hush);
-    hush = setTimeout(() => speechEl.classList.remove('show'), ms);
+    hush = setTimeout(() => {
+      speechEl.classList.remove('show');
+      speechEl.classList.remove('fresh');
+    }, ms);
   }
 
-  function set(state, msg) {
-    hostEl.className = 'momo';
+  function set(state, msg, isNew = false) {
+    if (flying) return;                    // he is not here to react
+    toRest();
     void hostEl.offsetWidth;               // restart the animation
     if (state && state !== 'idle') hostEl.classList.add(state);
-    if (msg) say(msg, state === 'sleep' ? 4200 : 2600);
+    if (isNew) hostEl.classList.add('learned');
+    if (msg) say(msg, state === 'sleep' ? 4200 : isNew ? 3600 : 2600, isNew);
     if (state === 'happy') burst(9);
-    if (state === 'cheer') burst(16);
+    if (state === 'cheer') burst(isNew ? 20 : 16);
 
     clearTimeout(revert);
     if (state && state !== 'sleep' && state !== 'idle') {
-      revert = setTimeout(() => { hostEl.className = 'momo'; }, state === 'cheer' ? 1300 : 1100);
+      revert = setTimeout(() => { if (!flying) toRest(); }, state === 'cheer' ? 1300 : 1100);
     }
     armIdle();
   }
 
-  const POKES = [
-    ['happy', '¡Ideay! ¿Qué tal?'],
-    ['speak', 'Escuchá bien'],
-    ['happy', 'Dale pues'],
-    ['cheer', '¡Qué tuani!'],
-    ['speak', 'Say it out loud'],
-    ['happy', 'Vamos, chele'],
-  ];
-  let pokeIndex = 0;
+  /** Say something he has earned for this moment. Returns the line, or null. */
+  function speak(when) {
+    const line = pickLine(when);
+    if (!line) return null;
+    set(line.state, line.say, line.isNew);
+    return line;
+  }
 
-  hostEl.closest('.perch')?.addEventListener('click', () => {
-    const [state, msg] = POKES[pokeIndex++ % POKES.length];
-    set(state, msg);
-  });
+  function wake() {
+    hostEl.className = `${base()} startle`;
+    setTimeout(() => { if (hostEl.classList.contains('startle')) toRest(); }, 700);
+    armIdle();
+  }
 
-  document.addEventListener('pointerdown', armIdle, { passive: true });
+  const perch = poke ? hostEl.closest('.perch') : null;
+  if (perch) {
+    let press = null;
+    let longFired = false;
+    const cancel = () => clearTimeout(press);
+
+    perch.addEventListener('pointerdown', () => {
+      longFired = false;
+      if (!onLongPress) return;
+      press = setTimeout(() => { longFired = true; onLongPress(api); }, LONG_PRESS_MS);
+    }, { passive: true });
+    perch.addEventListener('pointerup', cancel, { passive: true });
+    perch.addEventListener('pointerleave', cancel, { passive: true });
+    perch.addEventListener('pointercancel', cancel, { passive: true });
+
+    perch.addEventListener('click', () => {
+      if (longFired) { longFired = false; return; }   // the long press already answered
+      if (flying) return;                             // there is no bird to poke
+      if (asleep()) return wake();                    // startle him first, poke next tap
+      if (onPoke && onPoke(api)) return;              // a quiz answer was owed
+      speak('poke');
+    });
+  }
+
+  if (ambient) document.addEventListener('pointerdown', armIdle, { passive: true });
   armIdle();
 
-  return {
+  const api = {
     set,
     say,
+    speak,
+    flash,
+    flyAway,
     react: (correct, msg) => set(correct ? 'happy' : 'wrong', msg),
     celebrate: (msg) => set('cheer', msg),
+    /** Score out of 100 → the matching bucket of earned lines. */
+    reactToScore(pct) {
+      return speak(pct >= 80 ? 'great' : pct >= 50 ? 'ok' : 'poor');
+    },
+
+    /**
+     * Opening Today after being away. Same day or yesterday is just a normal
+     * visit. A few days and he says so. A week or more and the branch is bare
+     * when the screen appears — he arrives after you do, which is the whole
+     * point: coming back should not look identical to never having left.
+     */
+    arrive(daysAway = 0) {
+      if (daysAway < 2) return null;
+      if (daysAway >= LONG_ABSENCE_DAYS) {
+        hostEl.className = `${base()} offstage`;
+        setTimeout(() => flyIn('back'), 420);
+        return 'flew-in';
+      }
+      speak('back');
+      return 'greeted';
+    },
   };
+  return api;
 }

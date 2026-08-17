@@ -40,8 +40,16 @@ export const isKnown = (m) => m >= 0.2;
 const PUNCT = /[¿¡.,;:!?"'()«»‘’“”\-]/g;
 export const cleanWord = (w) => w.toLowerCase().replace(PUNCT, '');
 
-const TOKEN = /([a-záéíóúüñ¿¡]+|[^a-záéíóúüñ¿¡]+)/gi;
-const HAS_LETTER = /[a-záéíóúüñ]/i;
+// Any Unicode letter, not a hand-listed Spanish alphabet. The original class
+// was [a-záéíóúüñ], which has no ä or ö — so every Luzerndütsch word carrying
+// one shattered: "Märt" tokenized as "M" + "rt", "dänke" as "d" + "nke". The
+// halves matched nothing in the dictionary, which cost Swiss German three
+// quarters of its exposures, its word-tap lookups and part of its fluency
+// score. \p{L} means the next language added never hits this.
+// ¿¡ stay inside the word class so "¿Qué" survives as one token, exactly as
+// before; cleanWord strips them afterwards.
+const TOKEN = /([\p{L}¿¡]+|[^\p{L}¿¡]+)/gu;
+const HAS_LETTER = /\p{L}/u;
 
 export function tokenize(text) {
   const out = [];

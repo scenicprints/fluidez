@@ -74,6 +74,14 @@ test('tokenize keeps punctuation as its own non-word token', () => {
   assert.deepEqual(t.map((x) => x.isWord), [true, false, true]);
 });
 
+test('tokenize keeps non-Spanish letters whole', () => {
+  // A Spanish-only character class split these mid-word and cost Luzerndütsch
+  // most of its vocabulary tracking.
+  assert.deepEqual(tokenize('Märt').map((x) => x.raw), ['Märt']);
+  assert.deepEqual(tokenize('dänke schöö').map((x) => x.raw), ['dänke', ' ', 'schöö']);
+  assert.equal(cleanWord('Gmües'), 'gmües');
+});
+
 test('tokenize is reentrant — a global regex must not carry lastIndex', () => {
   assert.equal(tokenize('uno dos').length, tokenize('uno dos').length);
 });

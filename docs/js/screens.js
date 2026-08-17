@@ -8,7 +8,7 @@ import * as store from './store.js';
 import * as cloud from './cloud.js';
 import * as speech from './speech.js';
 import { content, lessonsByPhase, checkForContentUpdate, cacheSize, packVersion } from './content.js';
-import { MOMO_MINI } from './momo.js';
+import { MOMO_MINI, momoSvg, createMomo, daysBetween } from './momo.js';
 import {
   memoryStrength, band, calcFluency, fadingWords, leeches, tokenize, cleanWord,
   conjugate, generateExercises, gradeTyped, orderCandidates, scramble, shuffle, pick,
@@ -50,13 +50,39 @@ function fluency() {
   });
 }
 
+// Things worth a reaction that happen while Momo is nowhere to be seen —
+// mid-drill, mid-lesson. Held until the next screen he is actually on, which
+// is the wrap-up or Today, rather than fired into an empty room.
+let pending = { goal: false, streak: 0, patterns: [] };
+let greeted = false;
+
 function activity(reps = 1) {
   const before = store.daily.metToday();
   const { streak, newDay } = store.daily.record(reps);
   if (!before && store.daily.metToday()) {
-    momo?.celebrate(`Goal met — <b>${streak}</b> day${streak === 1 ? '' : 's'}`);
+    pending.goal = true;
+    pending.streak = streak;
   }
   return newDay;
+}
+
+/** Drain the queue into a list of moments, newest reason first. */
+function takePending() {
+  const out = [];
+  if (pending.goal) {
+    out.push({ when: 'goal', label: `Goal met — <b>${pending.streak}</b> day${pending.streak === 1 ? '' : 's'}` });
+  }
+  for (const title of pending.patterns) {
+    out.push({ when: 'pattern', label: `Pattern found — <b>${esc(title)}</b>` });
+  }
+  pending = { goal: false, streak: 0, patterns: [] };
+  return out;
+}
+
+/** Let a visible Momo work through the queue, one beat at a time. */
+function playPending(m, events, startAfter = 2600) {
+  if (!m || !events.length) return;
+  events.forEach((e, i) => setTimeout(() => m.speak(e.when), startAfter + i * 2800));
 }
 
 // ── header bits shared by several screens ───────────────────
@@ -77,6 +103,19 @@ export function renderToday() {
   paintLevel();
   const pad = $('todayPad');
   clear(pad);
+
+  // Coming back after a gap is the moment that decides whether a lapsed streak
+  // turns into a dead app, so it gets its own reaction — read once per app run,
+  // because store.daily.record() overwrites lastActive the second you do
+  // anything, and re-rendering Today would then look like you had never left.
+  if (!greeted) {
+    greeted = true;
+    momo?.arrive(daysBetween(store.daily.lastActive()));
+  }
+
+  // Anything that happened while he was off-screen — a goal crossed mid-lesson,
+  // a pattern unlocked while reading — gets said now that he is here to say it.
+  playPending(momo, takePending(), 900);
 
   const f = fluency();
   const prog = store.progress.all();
@@ -167,6 +206,18 @@ async function paintBoard() {
     host.innerHTML = '<p class="muted" style="margin:0">Nobody else yet. Send a friend the link and they pick their own user ID.</p>';
     return;
   }
+  // Somebody overtaking you is worth hearing about once — not on every render,
+  // and not again tomorrow for the same person at the same streak.
+  const myStreak = store.daily.streak();
+  const ahead = rows
+    .filter((r) => r.id !== session.userId && Number(r.streak || 0) > myStreak)
+    .sort((a, b) => Number(b.streak || 0) - Number(a.streak || 0))[0];
+  if (ahead && store.momoSeen.mark(`ahead:${ahead.id}:${Number(ahead.streak || 0)}`)) {
+    const name = esc(ahead.name || ahead.id);
+    const days = Number(ahead.streak || 0);
+    setTimeout(() => momo?.set('wrong', `<b>${name}</b> is ahead — ${days} days`), 1400);
+  }
+
   for (const r of rows) {
     const mine = r.id === session.userId;
     const fresh = r.lastActive === new Date().toISOString().slice(0, 10);
@@ -318,7 +369,7 @@ export function openReader(lesson) {
       const b = el('button', 'spk', '🔊');
       b.type = 'button';
       b.setAttribute('aria-label', 'Read this line');
-      b.addEventListener('click', () => { speech.warmUp(); speech.speak(sn.es, speakOpts()); momo?.set('speak'); });
+      b.addEventListener('click', () => { speech.warmUp(); speech.speak(sn.es, speakOpts()); });
       s.appendChild(b);
     }
     // The translation stays hidden until asked for — reading it for free is
@@ -408,7 +459,7 @@ function checkPatterns() {
     const met = (p.trigger || []).filter((w) => (vocab[w]?.exposures || 0) >= 1).length;
     if (met >= (p.min || 3)) {
       store.patterns.unlock(p.id);
-      momo?.celebrate(`Pattern found — <b>${esc(p.title)}</b>`);
+      pending.patterns.push(p.title);
     }
   }
 }
@@ -484,7 +535,6 @@ function paintScene() {
     pad.appendChild(reveal);
     speech.warmUp();
     speech.speak(step.es, speakOpts());
-    momo?.set('speak');
   }
 
   const opts = el('div', 'opts');
@@ -506,7 +556,6 @@ function answerScene(btn, option, opts, pad) {
   fb.innerHTML = `<b>${option.verdict === 'good' ? 'Perfect' : option.verdict === 'bad' ? 'Not that' : 'Understandable'}</b><span>${md(option.feedback)}</span>`;
   pad.appendChild(fb);
 
-  momo?.react(option.verdict !== 'bad', option.verdict === 'good' ? '¡Dale pues!' : option.verdict === 'bad' ? 'Ay, no' : 'Casi…');
   store.recordExposure([...new Set(tokenize(option.es).filter((t) => t.isWord).map((t) => cleanWord(t.raw)).filter((w) => content.dict[w]))]);
   activity();
 
@@ -519,7 +568,6 @@ function answerScene(btn, option, opts, pad) {
     if (last) {
       store.progress.markScenario(scene.id);
       sync();
-      momo?.celebrate('Scene finished');
       showScreen('scenes');
       renderScenes();
     } else {
@@ -755,7 +803,7 @@ export function renderMap() {
 let drill = null;
 
 function startDrill({ title, sub, items, render }) {
-  drill = { title, sub, items, render, index: 0, correct: 0, answered: 0 };
+  drill = { title, sub, items, render, index: 0, correct: 0, answered: 0, words: [] };
   $('drillTitle').textContent = title;
   showScreen('drill');
   paintDrill();
@@ -774,7 +822,10 @@ function paintDrill() {
 function finishItem(correct, word) {
   drill.answered++;
   if (correct) drill.correct++;
-  if (word) store.recordAnswer(word, correct);
+  if (word) {
+    store.recordAnswer(word, correct);
+    drill.words.push({ word, correct });
+  }
   // Repaint the score now, not on the next question — otherwise you answer
   // and the counter still reads 0 / 0.
   $('drillScore').textContent = `${drill.correct} / ${drill.answered}`;
@@ -795,23 +846,119 @@ function nextButton(pad, label = 'Next') {
 }
 
 function endDrill() {
-  const pct = drill.answered ? Math.round((drill.correct / drill.answered) * 100) : 0;
-  const pad = $('drillPad');
-  clear(pad);
   $('drillProg').style.width = '100%';
-  const c = el('div', 'card center');
-  c.innerHTML =
-    `<p class="label">${esc(drill.title)} finished</p>` +
-    `<div class="big" style="font-size:42px;color:${pct >= 80 ? 'var(--jade)' : pct >= 50 ? 'var(--oro)' : 'var(--barro)'}">${pct}%</div>` +
-    `<p class="sub">${drill.correct} of ${drill.answered} right</p>`;
-  pad.appendChild(c);
-  momo?.set(pct >= 80 ? 'cheer' : pct >= 50 ? 'happy' : 'wrong', pct >= 80 ? '¡Qué tuani!' : pct >= 50 ? 'Vamos bien' : 'Otra vez');
   sync();
+  renderWrap();
+}
+
+// ══ MOMO'S OWN QUIZ ═════════════════════════════════════════
+// Hold him down and he asks you a word you already know. Two beats and no new
+// screen: he says the word, you tap him for the answer. He only ever asks
+// about words you have met at least twice, so it stays a memory test rather
+// than a guess.
+let quizWord = null;
+
+export function momoQuiz() {
+  if (!momo) return;
+  const vocab = store.vocab.all();
+  const pool = Object.keys(vocab).filter((w) => content.dict[w] && (vocab[w].exposures || 0) >= 2);
+  if (!pool.length) {
+    momo.set('speak', 'Read a lesson first');
+    return;
+  }
+  quizWord = pool[Math.floor(Math.random() * pool.length)];
+  momo.set('speak', `<b>${esc(quizWord)}</b> &nbsp;…?`);
+  if (canAudio()) { speech.warmUp(); speech.speak(quizWord, speakOpts()); }
+}
+
+/** Consume the next poke as the answer, if one is owed. */
+function momoAnswer(m) {
+  if (!quizWord) return false;
+  const w = quizWord;
+  quizWord = null;
+  const en = String(content.dict[w]?.en || '').split('/')[0].trim();
+  m.set('happy', `<b>${esc(w)}</b> — ${esc(en)}`);
+  store.recordExposure(w);
+  sync();
+  return true;
+}
+
+export const momoHooks = { onLongPress: momoQuiz, onPoke: momoAnswer };
+
+// ══ WRAP-UP ═════════════════════════════════════════════════
+// A session used to end with a percentage painted into the drill screen,
+// where Momo does not live. It ends here now, on the one screen besides Today
+// that he is actually on, so a score is something he answers rather than a
+// number that appears in an empty room.
+let wrapMomo = null;
+
+function wrapBird() {
+  if (!wrapMomo) {
+    $('wrapMomo').innerHTML = momoSvg('wrap');
+    // ambient: false — a second self-arming sleep timer and a second
+    // document-wide activity listener would fight the one on Today.
+    // poke: false — here he answers your score and nothing else. Poking him
+    // belongs on Today; on this screen it would talk over the result.
+    wrapMomo = createMomo($('wrapMomo'), $('wrapSpeech'), $('wrapSparks'),
+      { ambient: false, poke: false });
+  }
+  return wrapMomo;
+}
+
+function renderWrap() {
+  const pct = drill.answered ? Math.round((drill.correct / drill.answered) * 100) : 0;
+  const tone = pct >= 80 ? 'var(--jade)' : pct >= 50 ? 'var(--oro)' : 'var(--barro)';
+
+  $('wrapTitle').textContent = `${drill.title} finished`;
+  $('wrapSub').textContent = `${drill.correct} of ${drill.answered} right`;
+  showScreen('wrap');
+
+  const pad = $('wrapPad');
+  clear(pad);
+
+  const score = el('div', 'card center');
+  score.innerHTML =
+    `<p class="label">${esc(drill.title)}</p>` +
+    `<div class="big" style="font-size:42px;color:${tone}">${pct}%</div>` +
+    `<p class="sub">${drill.correct} of ${drill.answered} right</p>`;
+  pad.appendChild(score);
+
+  // Only the multiple-choice kinds carry a single word — typing, dictation,
+  // word order and shadowing are graded against a whole sentence, so there is
+  // nothing honest to list for them.
+  if (drill.words.length) {
+    // A word can come round twice in one drill. Show it once, and if it went
+    // wrong on any pass it counts as slipped — colour means memory strength,
+    // and getting it right once does not mean it held.
+    const seen = new Map();
+    for (const { word, correct } of drill.words) {
+      seen.set(word, (seen.get(word) ?? true) && correct);
+    }
+    const got = [...seen].filter(([, ok]) => ok).map(([w]) => w);
+    const lost = [...seen].filter(([, ok]) => !ok).map(([w]) => w);
+    const tags = (words, cls) => words.map((w) => `<span class="wtag ${cls}">${esc(w)}</span>`).join('');
+    const c = el('div', 'card');
+    c.innerHTML =
+      '<p class="label">Words you met</p>' +
+      `<div class="wtags">${tags(got, 'strong')}${tags(lost, 'weak')}</div>`;
+    pad.appendChild(c);
+  }
+
+  const events = takePending();
+  for (const e of events) {
+    const c = el('div', 'card center');
+    c.innerHTML = `<p class="moment">${e.label}</p>`;
+    pad.appendChild(c);
+  }
 
   const again = el('button', 'go');
   again.type = 'button';
   again.textContent = 'Go again';
-  again.addEventListener('click', () => { drill.index = 0; drill.correct = 0; drill.answered = 0; paintDrill(); });
+  again.addEventListener('click', () => {
+    drill.index = 0; drill.correct = 0; drill.answered = 0; drill.words = [];
+    showScreen('drill');
+    paintDrill();
+  });
   pad.appendChild(again);
 
   const home = el('button', 'go ghost');
@@ -819,6 +966,10 @@ function endDrill() {
   home.textContent = 'Back to today';
   home.addEventListener('click', () => { showScreen('today'); renderToday(); });
   pad.appendChild(home);
+
+  const m = wrapBird();
+  m.reactToScore(pct);
+  playPending(m, events);
 }
 
 // ── review (multiple choice + typing) ───────────────────────
@@ -857,7 +1008,6 @@ function renderExercise(pad, item, done) {
       });
       b.classList.add(right ? 'right' : 'wrongc');
       done(right, item.word || item.correct);
-      momo?.react(right, right ? '¡Eso!' : 'Casi…');
       const fb = el('div', `fb show ${right ? 'good' : 'bad'}`);
       fb.innerHTML = `<b>${right ? 'Correct' : 'Not that one'}</b><span>${right ? '' : `It was <b>${esc(item.correct)}</b>.`}</span>`;
       pad.appendChild(fb);
@@ -888,7 +1038,6 @@ function renderTyped(pad, item, done) {
     input.classList.add(r.correct ? 'right' : 'wrongc');
     check.remove();
     done(r.correct, null);
-    momo?.react(r.correct, r.correct ? '¡Eso!' : 'Mirá…');
     const fb = el('div', `fb show ${r.correct ? 'good' : 'bad'}`);
     fb.innerHTML = `<b>${r.correct ? 'That is it' : (r.hint || 'Not quite')}</b><span>It reads <b>${esc(item.correct)}</b>.</span>`;
     pad.appendChild(fb);
@@ -944,7 +1093,6 @@ function renderVerb(pad, item, done) {
       done(right, null);
       store.progress.bump('verbsTotal');
       if (right) store.progress.bump('verbsCorrect');
-      momo?.react(right, right ? '¡Eso!' : 'Casi…');
       const fb = el('div', `fb show ${right ? 'good' : 'bad'}`);
       fb.innerHTML = `<b>${right ? 'Correct' : 'Not that one'}</b><span>${esc(item.subject)} <b>${esc(item.correct)}</b>.</span>`;
       pad.appendChild(fb);
@@ -1000,7 +1148,6 @@ function renderOrder(pad, item, done) {
     done(right, null);
     store.progress.bump('orderTotal');
     if (right) store.progress.bump('orderCorrect');
-    momo?.react(right, right ? '¡Dale pues!' : 'Mmm…');
     const fb = el('div', `fb show ${right ? 'good' : 'bad'}`);
     fb.innerHTML = `<b>${right ? 'That is it' : 'Not the order'}</b><span>It reads <b>${esc(item.es)}</b> — from ${esc(item.lessonTitle)}.</span>`;
     pad.appendChild(fb);
@@ -1026,7 +1173,7 @@ function renderDictation(pad, item, done) {
   const play = el('button', 'go');
   play.type = 'button';
   play.textContent = '🔊 Play again';
-  play.addEventListener('click', () => { speech.speak(item.es, speakOpts()); momo?.set('speak'); });
+  play.addEventListener('click', () => { speech.speak(item.es, speakOpts()); });
   card.appendChild(play);
 
   const ladder = el('div', 'ladder');
@@ -1067,7 +1214,6 @@ function renderDictation(pad, item, done) {
     done(r.correct, null);
     store.progress.bump('dictationTotal');
     if (r.correct) store.progress.bump('dictationCorrect');
-    momo?.react(r.correct, r.correct ? '¡Perfecto!' : 'Escuchá otra vez');
     const fb = el('div', `fb show ${r.correct ? 'good' : 'bad'}`);
     fb.innerHTML = `<b>${r.correct ? 'Heard it' : (r.hint || 'Not quite')}</b><span>It was <b>${esc(item.es)}</b> — ${esc(item.en)}</span>`;
     pad.appendChild(fb);
@@ -1078,7 +1224,6 @@ function renderDictation(pad, item, done) {
   pad.appendChild(check);
 
   speech.speak(item.es, speakOpts());
-  momo?.set('speak');
 }
 
 // ── shadowing ───────────────────────────────────────────────
@@ -1104,7 +1249,7 @@ function renderShadow(pad, item, done) {
   const listen = el('button', 'go ghost');
   listen.type = 'button';
   listen.textContent = '🔊 Hear it';
-  listen.addEventListener('click', () => { speech.speak(item.es, speakOpts()); momo?.set('speak'); });
+  listen.addEventListener('click', () => { speech.speak(item.es, speakOpts()); });
   pad.appendChild(listen);
 
   const rec = el('button', 'recbtn', '●');
@@ -1134,7 +1279,6 @@ function renderShadow(pad, item, done) {
         rec.textContent = '●';
         if (url) { player.src = url; player.style.display = 'block'; }
         done(true, null);   // nothing to fail — the point is hearing yourself
-        momo?.set('happy', 'Otra vez, más rápido');
         if (!pad.querySelector('.go:last-of-type[data-next]')) {
           const b = nextButton(pad, 'Next line');
           b.dataset.next = '1';
@@ -1342,13 +1486,13 @@ function wire() {
     speech.warmUp();
     (async () => {
       for (const sn of openLesson.sentences) {
-        momo?.set('speak');
         await speech.speak(sn.es, speakOpts());
       }
     })();
   });
   $('sceneClose').addEventListener('click', () => { showScreen('scenes'); renderScenes(); });
   $('drillClose').addEventListener('click', () => { speech.stop(); showScreen('today'); renderToday(); });
+  $('wrapClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
   $('patClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
   $('phrasesClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
   $('settingsClose').addEventListener('click', () => { showScreen('today'); renderToday(); });

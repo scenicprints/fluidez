@@ -102,6 +102,7 @@ export const content = {
   lessons: [],
   scenarios: [],
   verbs: null,
+  momo: [],           // what the mascot may say, gated on vocabulary
 
   features() {
     const declared = this.manifest && this.manifest.features;
@@ -191,6 +192,7 @@ function applyPack(pack) {
   content.lessons = pack.lessons || [];
   content.scenarios = pack.scenarios || [];
   content.verbs = pack.verbs || null;
+  content.momo = pack.momo || [];
 }
 
 export function packVersion(code) {
@@ -234,6 +236,9 @@ function applyBundle(lang, bundle, onProgress) {
     lessons: (bundle.lessons || []).map(asLesson),
     scenarios: (bundle.scenarios || []).map(asScenario),
     verbs: bundle.verbs || null,
+    // A pack built before Momo had lines simply has none, and the app falls
+    // back to its built-in English set rather than showing a mute bird.
+    momo: (bundle.momo && bundle.momo.lines) || bundle.momo || [],
     fetchedAt: Date.now(),
   };
   applyPack(pack);
@@ -310,7 +315,15 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
     step();
   }
 
-  const pack = { language: lang, manifest, dict, patterns, lessons, scenarios, verbs, fetchedAt: Date.now() };
+  let momo = [];
+  if (manifest.momo) {
+    try {
+      const doc = await getContent(lang, manifest.momo);
+      momo = (doc && doc.lines) || doc || [];
+    } catch {}
+  }
+
+  const pack = { language: lang, manifest, dict, patterns, lessons, scenarios, verbs, momo, fetchedAt: Date.now() };
   applyPack(pack);
   const stored = cacheWrite(CK.pack(lang.code), pack);
   onProgress({ phase: 'done', done: total, total, stored });

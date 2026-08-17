@@ -97,6 +97,33 @@ export const progress = {
   },
 };
 
+// Which of Momo's lines you have already heard him say. Kept so that the
+// first time a line becomes available — because you finally met the word that
+// unlocks it — he uses that one, and it lands as him having learnt something.
+export const momoLines = {
+  heard: () => read('momoLines', []),
+  save: (list) => write('momoLines', list),
+  learn(id) {
+    const list = this.heard();
+    if (!list.includes(id)) { list.push(id); this.save(list); }
+  },
+};
+
+// One-off things Momo has already remarked on — a friend overtaking your
+// streak, say. Separate from momoLines so it cannot muddle which of his lines
+// count as newly learnt.
+export const momoSeen = {
+  all: () => read('momoSeen', []),
+  /** Records `key` and returns true only the first time it is seen. */
+  mark(key) {
+    const list = this.all();
+    if (list.includes(key)) return false;
+    list.push(key);
+    write('momoSeen', list);
+    return true;
+  },
+};
+
 export const patterns = {
   unlocked: () => read('patterns', []),
   save: (list) => write('patterns', list),

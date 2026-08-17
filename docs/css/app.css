@@ -170,6 +170,181 @@ button { font-family: inherit; color: inherit; }
 .momo.sleep .zzz { opacity: 1; animation: zfloat 2.6s ease-in-out infinite; }
 @keyframes zfloat { 0% { transform: translate(0,0); opacity: 0; } 30% { opacity: .85; } 100% { transform: translate(13px,-24px); opacity: 0; } }
 
+/* Idle beats. The tail alone, swinging on a fixed 3.6s loop forever, is what
+ * made him read as a metronome — one of these fires at random every 12–20s so
+ * the stillness between movements varies. All of it rides the existing rig;
+ * none of it needs new artwork. */
+
+/* Preening: head dips to a wing and works along it. Motmots really do this,
+ * same as the tail swing — his idle stays his own behaviour. */
+.momo.preen .m-head { animation: preen 1.15s ease-in-out; }
+@keyframes preen {
+  0%,100% { transform: rotate(0) translate(0,0); }
+  30% { transform: rotate(-30deg) translate(-7px,7px); }
+  50% { transform: rotate(-24deg) translate(-6px,5px); }
+  70% { transform: rotate(-32deg) translate(-8px,7px); }
+}
+.momo.preen .m-wingL { transform: rotate(-13deg); }
+
+/* A single sharp tail flick — what a motmot does when it spots something. */
+.momo.flick .m-tail { animation: flick 1.1s cubic-bezier(.2,1.6,.4,1); }
+@keyframes flick {
+  0% { transform: rotate(0); }
+  12% { transform: rotate(-19deg); }
+  30% { transform: rotate(13deg); }
+  48% { transform: rotate(-7deg); }
+  100% { transform: rotate(0); }
+}
+.momo.flick .m-head { transform: rotate(-6deg); }
+
+/* A hop to a different spot on the branch, so the perch is somewhere he
+ * lives rather than a stage he is pinned to. */
+.momo.sidehop .m-float { animation: sidehop 1.2s cubic-bezier(.3,1.3,.5,1); }
+@keyframes sidehop {
+  0% { transform: translate(0,0); }
+  25% { transform: translate(9px,-15px) rotate(4deg); }
+  50% { transform: translate(17px,0); }
+  75% { transform: translate(9px,-8px) rotate(-3deg); }
+  100% { transform: translate(0,0); }
+}
+
+/* Wing stretch and a yawn, nine seconds before he actually dozes off, so
+ * falling asleep is something you watch happen. */
+/* The wings are drawn behind the body, so rotating them on the spot just
+ * tucks them further out of sight — only about 10px of a 32px wing is ever
+ * clear of the belly. They have to travel outward as well as pivot, and hold
+ * there, or there is no stretch to see. */
+.momo.stretch .m-wingL { animation: stretchL 1.6s ease-in-out; }
+.momo.stretch .m-wingR { animation: stretchR 1.6s ease-in-out; }
+@keyframes stretchL {
+  0%,100% { transform: translate(0,0) rotate(0) scale(1); }
+  35%,65% { transform: translate(-24px,-6px) rotate(-70deg) scale(1.1,1.35); }
+}
+@keyframes stretchR {
+  0%,100% { transform: translate(0,0) rotate(0) scale(1); }
+  35%,65% { transform: translate(24px,-6px) rotate(70deg) scale(1.1,1.35); }
+}
+.momo.stretch .m-beak { animation: yawn 1.6s ease-in-out; }
+@keyframes yawn { 0%,100% { transform: scaleY(1); } 45% { transform: translateY(3px) scaleY(1.9); } }
+.momo.stretch .m-head { transform: rotate(-7deg) translateY(-2px); }
+
+/* Startled awake — you tapped a sleeping bird. */
+.momo.startle .m-float { animation: startle .7s cubic-bezier(.3,1.7,.5,1); }
+@keyframes startle {
+  0% { transform: translateY(0); }
+  22% { transform: translateY(-19px) scaleY(1.07); }
+  55% { transform: translateY(2px) scaleY(.95); }
+  100% { transform: translateY(0); }
+}
+.momo.startle .m-wingL { transform: rotate(-38deg); }
+.momo.startle .m-wingR { transform: rotate(38deg); }
+.momo.startle .lid { animation: none; transform: scaleY(0); }
+
+/* A whole-body ruffle, for a score that went badly. */
+.momo.wrong .m-float { animation: shakeoff .75s ease-in-out; }
+@keyframes shakeoff {
+  0%,100% { transform: translateX(0) rotate(0); }
+  15% { transform: translateX(-4px) rotate(-3deg); }
+  35% { transform: translateX(4px) rotate(3deg); }
+  55% { transform: translateX(-3px) rotate(-2deg); }
+  78% { transform: translateX(2px) rotate(1deg); }
+}
+
+/* Flight. The flap has to carry the wings clear of the body the same way the
+ * stretch does — rotation alone leaves them hidden behind the belly and he
+ * looks like he is being thrown rather than flying. */
+@keyframes flapL {
+  0%,100% { transform: translate(-16px,-2px) rotate(-38deg) scale(1,1.15); }
+  50%     { transform: translate(-20px,-14px) rotate(-96deg) scale(1,1.3); }
+}
+@keyframes flapR {
+  0%,100% { transform: translate(16px,-2px) rotate(38deg) scale(1,1.15); }
+  50%     { transform: translate(20px,-14px) rotate(96deg) scale(1,1.3); }
+}
+.momo.flyoff .m-wingL, .momo.flyin .m-wingL { animation: flapL .19s ease-in-out infinite; }
+.momo.flyoff .m-wingR, .momo.flyin .m-wingR { animation: flapR .19s ease-in-out infinite; }
+.momo.flyoff .m-tail, .momo.flyin .m-tail { animation: swing .5s ease-in-out infinite; }
+
+.momo.flyoff .m-float { animation: flyoff 1s ease-in forwards; }
+@keyframes flyoff {
+  0%   { transform: translate(0,0) rotate(0) scale(1); opacity: 1; }
+  18%  { transform: translate(0,10px) scale(1.04,.94); opacity: 1; }
+  100% { transform: translate(120px,-230px) rotate(16deg) scale(.55); opacity: 0; }
+}
+
+.momo.flyin .m-float { animation: flyin 1.15s cubic-bezier(.2,.7,.3,1); }
+@keyframes flyin {
+  0%   { transform: translate(-130px,-240px) rotate(-14deg) scale(.55); opacity: 0; }
+  35%  { opacity: 1; }
+  78%  { transform: translate(0,-16px) rotate(0) scale(1.02); opacity: 1; }
+  90%  { transform: translate(0,3px) scale(1.03,.95); }
+  100% { transform: translate(0,0) scale(1); opacity: 1; }
+}
+
+/* Waiting off-screen: he is genuinely not on the branch. */
+.momo.offstage .m-float { opacity: 0; }
+
+/* Time of day. Night slows the tail and hoods the eyes; morning quickens him.
+ * Applied as a lasting class, so set() rebuilds className from it rather than
+ * dropping back to a bare .momo and losing it. */
+.momo.night .m-tail { animation-duration: 6s; }
+.momo.night .m-float { animation-duration: 4.6s; }
+.momo.night .lid { animation-duration: 4s; }
+.momo.night .m-head { transform: rotate(4deg) translateY(1px); }
+.momo.night .m-glow { opacity: .1; }
+.momo.morning .m-tail { animation-duration: 2.7s; }
+.momo.morning .m-float { animation-duration: 2.6s; }
+.momo.morning .m-glow { opacity: .22; }
+/* Never let the ambient tilt or glow fight an actual reaction. */
+.momo.night.happy .m-head, .momo.night.cheer .m-head,
+.momo.night.speak .m-head, .momo.night.wrong .m-head,
+.momo.night.sleep .m-head { transform: none; }
+.momo.night.happy .m-glow, .momo.night.cheer .m-glow,
+.momo.morning.happy .m-glow, .momo.morning.cheer .m-glow { opacity: 1; }
+
+/* A line he has never been able to say before. The glow lingers past the
+ * usual reaction so the moment registers as him having learnt something. */
+.momo.learned .m-glow { opacity: 1; animation: learned 2.2s ease-out; }
+@keyframes learned {
+  0% { opacity: 0; transform: scale(.7); }
+  25% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 0; transform: scale(1.15); }
+}
+/* .speech sits before .momo in the DOM, so no sibling combinator reaches it —
+ * say() adds this class directly. */
+.speech.fresh { border-color: var(--oro); box-shadow: 0 0 18px rgba(232,163,61,.28); }
+.speech.fresh::after {
+  content: 'new'; margin-left: 8px; font-size: 9.5px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--oro); vertical-align: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-tail, .m-float, .lid { animation: none !important; }
+  .momo.preen .m-head, .momo.flick .m-tail, .momo.sidehop .m-float,
+  .momo.stretch .m-wingL, .momo.stretch .m-wingR, .momo.stretch .m-beak,
+  .momo.startle .m-float, .momo.wrong .m-float, .momo.learned .m-glow,
+  .momo.flyoff .m-float, .momo.flyin .m-float,
+  .momo.flyoff .m-wingL, .momo.flyoff .m-wingR,
+  .momo.flyin .m-wingL, .momo.flyin .m-wingR { animation: none !important; }
+  /* Never leave the branch empty when motion is off. */
+  .momo.flyoff .m-float, .momo.offstage .m-float { opacity: 1; transform: none; }
+}
+
+/* ── wrap-up ───────────────────────────────────────────── */
+/* Colour still means memory strength here: jade for a word that held, clay for
+ * one that slipped. Read-only, so deliberately not .wchip — that one is the
+ * tappable word-order bank and carries a cursor and a press transform. */
+#wrapPad .card + .card, #wrapPad .card + .go, #wrapPad .go + .go { margin-top: 11px; }
+.wtags { display: flex; flex-wrap: wrap; gap: 7px; }
+.wtag {
+  padding: 5px 11px; border-radius: 9px; font-family: var(--serif); font-size: 15px;
+  border: 1px solid var(--linea); background: var(--ceniza2); color: var(--txt2);
+}
+.wtag.strong { border-color: var(--jade-d); color: var(--jade); }
+.wtag.weak { border-color: var(--barro-d); color: var(--barro); }
+.moment { margin: 0; font-size: 14px; color: var(--txt2); }
+.moment b { color: var(--oro); font-weight: 700; }
+
 /* ── home ──────────────────────────────────────────────── */
 .streak { display: flex; align-items: center; gap: 14px; }
 .flame { font-size: 26px; filter: drop-shadow(0 0 12px rgba(232,163,61,.55)); }
