@@ -171,7 +171,10 @@ async function switchLanguage(code = null, force = false) {
     enterApp();
     return;
   }
-  await showLanguagePicker({ standalone: true });
+  // Pass the code through. Dropping it here is what turned "get the new
+  // lessons" into "choose a language", and the picker then loaded the cached
+  // pack anyway, so the update could never actually land.
+  await showLanguagePicker({ standalone: true, code, force });
 }
 
 // ── entering the app ────────────────────────────────────────

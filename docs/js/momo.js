@@ -146,24 +146,17 @@ export function daysBetween(stamp, now = new Date()) {
 // shouting "¡Qué tuani!" at it, and a day-one beginner was greeted in phase-5
 // street slang.
 //
-// These built-in lines are the floor, used only when a pack ships none. They
-// are English on purpose: a language added to the registry tomorrow gets a
-// mascot who says nothing wrong, rather than one who reverts to Spanish.
-const DEFAULT_LINES = [
-  { id: 'd-welcome', when: 'welcome', state: 'happy', say: "Let's go" },
-  { id: 'd-back',    when: 'back',    state: 'cheer', say: "You're back!" },
-  { id: 'd-poke1',   when: 'poke',    state: 'happy', say: 'Hey — how goes it?' },
-  { id: 'd-poke2',   when: 'poke',    state: 'speak', say: 'Say it out loud' },
-  { id: 'd-poke3',   when: 'poke',    state: 'happy', say: 'Go on then' },
-  { id: 'd-great',   when: 'great',   state: 'cheer', say: 'Nicely done' },
-  { id: 'd-ok',      when: 'ok',      state: 'happy', say: 'Not bad' },
-  { id: 'd-poor',    when: 'poor',    state: 'wrong', say: 'Again?' },
-  { id: 'd-goal',    when: 'goal',    state: 'cheer', say: 'Goal met!' },
-  { id: 'd-pattern', when: 'pattern', state: 'cheer', say: 'New pattern!' },
-  { id: 'd-sleep',   when: 'sleep',   state: 'sleep', say: 'Zzz… tap me' },
-];
+// A pack that ships no lines gets a bird who reacts and says nothing. He used
+// to fall back to a set of English ones, which is indefensible in a language
+// app: the whole point is that you hear the language, and English coming out
+// of him is worse than silence. This is only ever reached by a language whose
+// pack has no momo.json, and then only until it does.
+const SILENT_STATES = {
+  welcome: 'happy', back: 'cheer', poke: 'happy', great: 'cheer',
+  ok: 'happy', poor: 'wrong', goal: 'cheer', pattern: 'cheer', sleep: 'sleep',
+};
 
-const allLines = () => (content.momo && content.momo.length ? content.momo : DEFAULT_LINES);
+const allLines = () => (content.momo && content.momo.length ? content.momo : []);
 
 // Lower-cased because the two paths that record a word disagree: the reader
 // stores cleanWord(...) ("grüezi") while the warm-up stores the raw headword
@@ -358,10 +351,17 @@ export function createMomo(hostEl, speechEl, sparksEl,
     armIdle();
   }
 
-  /** Say something he has earned for this moment. Returns the line, or null. */
+  /**
+   * React to a moment, in the language being learnt. With no line earned yet
+   * he still moves — the reaction is the point, the words are the reward.
+   */
   function speak(when) {
     const line = pickLine(when);
-    if (!line) return null;
+    if (!line) {
+      const state = SILENT_STATES[when];
+      if (state) set(state, null);
+      return null;
+    }
     set(line.state, line.say, line.isNew);
     return line;
   }

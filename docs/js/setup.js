@@ -134,17 +134,26 @@ async function afterAuth(isNew, fromCloud = false) {
 }
 
 // ── language ────────────────────────────────────────────────
-export async function showLanguagePicker({ standalone = false } = {}) {
+export async function showLanguagePicker({ standalone = false, code = null, force = false } = {}) {
+  // Refreshing a language you are already on is not a choice — asking "what
+  // are you learning?" to accept new lessons for the course you are mid-way
+  // through is a question with one answer. Go straight to the download.
+  if (code && force) {
+    await loadLanguages();
+    const lang = findLanguage(code);
+    if (lang) return ensurePack(lang, { standalone, force: true });
+  }
+
   showPane('lang');
 
   // Paint whatever is already known first — the cached registry, or at worst
   // the built-in fallback. A slow network must never leave this on a spinner.
-  paintLanguages(standalone);
+  paintLanguages(standalone, force);
   await loadLanguages();
-  paintLanguages(standalone);
+  paintLanguages(standalone, force);
 }
 
-function paintLanguages(standalone) {
+function paintLanguages(standalone, force = false) {
   const list = $('langList');
   clear(list);
   const current = store.settings.get('language');
@@ -162,15 +171,19 @@ function paintLanguages(standalone) {
         account.language = lang.code;
         cloud.updateAccount(account.userId, { language: lang.code });
       }
-      await ensurePack(lang, { standalone });
+      await ensurePack(lang, { standalone, force: force && lang.code === current });
     });
     list.appendChild(row);
   }
 }
 
-async function ensurePack(lang, { standalone = false } = {}) {
-  // Already downloaded? Straight in.
-  if (loadCachedPack(lang.code)) {
+async function ensurePack(lang, { standalone = false, force = false } = {}) {
+  // Already downloaded? Straight in — unless we are here precisely because
+  // there is newer content, in which case loading the cache is the one thing
+  // that must not happen. Without the force check this returned "resumed" off
+  // the stale pack, nothing downloaded, the stored version never moved, and
+  // the "New lessons are available" banner came back every launch forever.
+  if (!force && loadCachedPack(lang.code)) {
     return standalone ? finish({ resumed: true, account }) : afterPack();
   }
   await runDownload(lang, standalone);
