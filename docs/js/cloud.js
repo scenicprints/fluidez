@@ -19,6 +19,23 @@ let failed = false;
 export const isConfigured = () => !!(firebaseConfig && firebaseConfig.projectId);
 export const isOnline = () => navigator.onLine !== false;
 
+// Running the app from a dev server used to publish straight into the live
+// database — a local test session put a "devbird" user on everybody's streak
+// board, and its progress document cannot even be deleted, because the rules
+// rightly refuse to destroy anyone's vocabulary. Reads still work locally, so
+// the board and sign-in behave normally; only writes are held back.
+const isLocalDev = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+let warnedLocal = false;
+function blockedLocally(what) {
+  if (!isLocalDev) return false;
+  if (!warnedLocal) {
+    warnedLocal = true;
+    console.warn('[cloud] running locally — writes are disabled so testing cannot reach the live database');
+  }
+  console.warn(`[cloud] skipped ${what} (local dev)`);
+  return true;
+}
+
 async function init() {
   if (db) return db;
   if (failed || !isConfigured() || !isOnline()) return null;
@@ -73,6 +90,7 @@ export async function fetchAccount(userId) {
 }
 
 export async function createAccount(userId, record) {
+  if (blockedLocally('createAccount')) return { ok: false, local: true };
   const d = await withTimeout(init(), 6000);
   if (!d) return { ok: false, offline: true };
   try {
@@ -88,6 +106,7 @@ export async function createAccount(userId, record) {
 }
 
 export async function updateAccount(userId, patch) {
+  if (blockedLocally('updateAccount')) return false;
   const d = await init();
   if (!d) return false;
   try {
@@ -112,6 +131,7 @@ let pending = null;
 
 /** Debounced — a reading session fires this on every sentence. */
 export function pushProgress(userId, snapshot, { immediate = false } = {}) {
+  if (blockedLocally('pushProgress')) return;
   pending = { userId, snapshot };
   if (pushTimer) clearTimeout(pushTimer);
   if (immediate) return flushProgress();
@@ -147,6 +167,7 @@ if (typeof window !== 'undefined') {
 // A tiny public row per person. Kept separate from progress so reading the
 // board never means reading anybody's whole vocabulary.
 export async function publishBoardRow(userId, row) {
+  if (blockedLocally('publishBoardRow')) return false;
   const d = await init();
   if (!d) return false;
   try {

@@ -97,6 +97,10 @@ button { font-family: inherit; color: inherit; }
 .card { background: var(--ceniza); border: 1px solid var(--linea); border-radius: 17px; padding: 15px; }
 .card.tap { cursor: pointer; transition: transform .12s, border-color .16s, background .16s; }
 .card.tap:active { transform: scale(.982); border-color: var(--oro-d); background: var(--ceniza2); }
+/* Matches .node.lock on the Path, so a locked scene reads the same as a
+ * locked lesson rather than inventing a second visual language for it. */
+.card.lock { opacity: .42; cursor: default; }
+.card.lock .cont-title { font-family: var(--sans); font-size: 15px; color: var(--txt3); }
 
 .go {
   width: 100%; padding: 14px; border-radius: 12px; border: 0; cursor: pointer;

@@ -249,7 +249,9 @@ export function renderPath() {
     return;
   }
 
-  // A phase opens once the one before it is finished.
+  // A phase opens once the one before it is finished. openPhases() applies
+  // the same rule for Scenes, so the two screens can never disagree about how
+  // far along you are.
   let unlocked = true;
   for (const [phase, lessons] of byPhase) {
     const head = el('div', 'phase-h' + (unlocked ? '' : ' locked'));
@@ -468,6 +470,21 @@ function checkPatterns() {
 }
 
 // ══ SCENES ══════════════════════════════════════════════════
+/**
+ * Which phases you have reached, by the Path's own rule: a phase opens once
+ * every lesson in the one before it has been read. Phase 0 is always open.
+ */
+function openPhases() {
+  const read = store.progress.all().storiesRead || [];
+  const open = new Set();
+  let unlocked = true;
+  for (const [phase, lessons] of lessonsByPhase()) {
+    if (unlocked) open.add(phase);
+    unlocked = unlocked && lessons.every((l) => read.includes(l.id));
+  }
+  return open;
+}
+
 export function renderScenes() {
   paintLevel();
   const done = store.progress.all().scenariosDone || [];
@@ -478,13 +495,20 @@ export function renderScenes() {
     pad.innerHTML = '<p class="empty">This course has no scenes.</p>';
     return;
   }
+
+  // Scenes were entirely ungated — every one of the forty was playable on day
+  // one, including phase 7, while the Path beside it was still locked at
+  // phase 1. A scene is the phase's payoff; you have to get there first.
+  const open = openPhases();
   for (const s of content.scenarios) {
-    const c = el('div', 'card tap');
+    const locked = !open.has(s.phase);
+    const c = el('div', 'card' + (locked ? ' lock' : ' tap'));
     c.innerHTML =
-      `<p class="label">Phase ${s.phase} · ${esc(phaseName(s.phase))}${done.includes(s.id) ? ' · played' : ''}</p>` +
+      `<p class="label">${locked ? '🔒 ' : ''}Phase ${s.phase} · ${esc(phaseName(s.phase))}` +
+      `${!locked && done.includes(s.id) ? ' · played' : ''}</p>` +
       `<div class="cont-title es" style="font-size:19px">${esc(s.title)}</div>` +
-      `<div class="sub">${esc(s.desc)}</div>`;
-    c.addEventListener('click', () => openScene(s));
+      `<div class="sub">${locked ? `Opens when you finish phase ${s.phase - 1}` : esc(s.desc)}</div>`;
+    if (!locked) c.addEventListener('click', () => openScene(s));
     pad.appendChild(c);
   }
 }
