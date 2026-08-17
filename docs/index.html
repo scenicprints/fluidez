@@ -28,6 +28,7 @@
   <symbol id="ic-ear" viewBox="0 0 24 24"><path d="M7.5 8.4a4.5 4.5 0 0 1 9 0c0 2.6-2.4 3.4-3.3 5-.5.9-.4 2-1.9 2"/><circle cx="11.5" cy="19.6" r="1.1"/><path d="M4.6 12.4a7.4 7.4 0 0 1 2.3-6.9"/></symbol>
   <symbol id="ic-mic" viewBox="0 0 24 24"><rect x="9.2" y="2.8" width="5.6" height="10.6" rx="2.8"/><path d="M5.6 11.2a6.4 6.4 0 0 0 12.8 0"/><path d="M12 17.6v3.6"/></symbol>
   <symbol id="ic-life" viewBox="0 0 24 24"><path d="M12 20.6s-7.6-4.4-7.6-9.6a4.3 4.3 0 0 1 7.6-2.8 4.3 4.3 0 0 1 7.6 2.8c0 5.2-7.6 9.6-7.6 9.6z"/></symbol>
+  <symbol id="ic-map" viewBox="0 0 24 24"><path d="M9 4.2 3.4 6.4v13.4L9 17.6l6 2.2 5.6-2.2V4.2L15 6.4z"/><path d="M9 4.2v13.4M15 6.4v13.4"/></symbol>
   <symbol id="ic-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M18.9 14.6a1.5 1.5 0 0 0 .3 1.7l.1.1a1.8 1.8 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-2.6 1.1v.2a1.8 1.8 0 1 1-3.6 0v-.1a1.5 1.5 0 0 0-2.6-1.1l-.1.1a1.8 1.8 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0-1.1-2.6h-.2a1.8 1.8 0 1 1 0-3.6h.1a1.5 1.5 0 0 0 1.1-2.6l-.1-.1a1.8 1.8 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 2.6-1.1v-.2a1.8 1.8 0 1 1 3.6 0v.1a1.5 1.5 0 0 0 2.6 1.1l.1-.1a1.8 1.8 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0 1.1 2.6h.2a1.8 1.8 0 1 1 0 3.6h-.1a1.5 1.5 0 0 0-1.4.9z"/></symbol>
 </defs></svg>
 
@@ -150,6 +151,31 @@
     <nav class="tabs" id="tabsPath"></nav>
   </section>
 
+  <!-- ══ WARM-UP (before a lesson) ══ -->
+  <section class="screen" id="sc-warmup">
+    <div class="topbar">
+      <div><div class="brand" id="wuTitle" style="font-size:18px"></div><div class="sub-lang">Vocab warm-up</div></div>
+      <div class="topright">
+        <span class="levelchip" id="wuCount" style="cursor:default">1 / 1</span>
+        <button class="iconbtn" id="wuClose" type="button" aria-label="Skip">✕</button>
+      </div>
+    </div>
+    <div class="body">
+      <div class="drill" style="padding-top:14px">
+        <p class="muted center" style="margin:0">Learn these before reading. Tap the card to reveal.</p>
+        <button class="wu-card" id="wuCard" type="button">
+          <span class="wu-word es" id="wuWord"></span>
+          <span class="wu-pos" id="wuPos"></span>
+          <span class="wu-hint" id="wuHint">Tap to reveal</span>
+          <span class="wu-mean en" id="wuMean"></span>
+          <span class="wu-note en" id="wuNote"></span>
+        </button>
+        <div class="wu-dots" id="wuDots"></div>
+        <button class="go" id="wuNext" type="button" style="visibility:hidden">Next word</button>
+      </div>
+    </div>
+  </section>
+
   <!-- ══ READER ══ -->
   <section class="screen" id="sc-read">
     <div class="paper">
@@ -197,10 +223,16 @@
   <!-- ══ WORDS ══ -->
   <section class="screen" id="sc-words">
     <div class="topbar">
-      <div><div class="brand">Your words</div><div class="sub-lang">Fading first — those need you</div></div>
+      <div><div class="brand">Your words</div><div class="sub-lang" id="wordsSub">Fading first — those need you</div></div>
       <button class="levelchip" id="levelChip4" type="button">A0 · 0%</button>
     </div>
-    <div class="body"><div class="pad" id="wordsPad"></div></div>
+    <div class="body">
+      <div class="pad" style="padding-bottom:8px">
+        <input class="searchbox" id="wordSearch" type="search" autocapitalize="none" autocorrect="off"
+               spellcheck="false" placeholder="Search Spanish or English…" aria-label="Search words"/>
+      </div>
+      <div class="pad" id="wordsPad"></div>
+    </div>
     <nav class="tabs" id="tabsWords"></nav>
   </section>
 
@@ -215,6 +247,27 @@
     </div>
     <div class="prog"><i id="drillProg"></i></div>
     <div class="body"><div class="drill" id="drillPad"></div></div>
+  </section>
+
+  <!-- ══ FLUENCY ══ -->
+  <section class="screen" id="sc-fluency">
+    <div class="topbar">
+      <div><div class="brand">Your fluency</div><div class="sub-lang" id="fluencySub"></div></div>
+      <div class="topright">
+        <button class="iconbtn" id="mapBtn" type="button" aria-label="Fluency map"><svg><use href="#ic-map"/></svg></button>
+        <button class="iconbtn" id="fluencyClose" type="button" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="body"><div class="pad" id="fluencyPad"></div></div>
+  </section>
+
+  <!-- ══ FLUENCY MAP ══ -->
+  <section class="screen" id="sc-map">
+    <div class="topbar">
+      <div><div class="brand">Fluency map</div><div class="sub-lang" id="mapSub"></div></div>
+      <button class="iconbtn" id="mapClose" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="body"><div class="pad" id="mapPad"></div></div>
   </section>
 
   <!-- ══ PATTERNS ══ -->

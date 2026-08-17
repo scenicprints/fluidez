@@ -118,7 +118,7 @@ export function renderToday() {
       <div class="sub">${esc(next.desc)} · Phase ${next.phase} · ${esc(phaseName(next.phase))}</div>
       <div class="bar"><i style="width:${Math.round((read.length / Math.max(1, content.lessons.length)) * 100)}%"></i></div>
       <button class="go" type="button">${done ? 'Open' : 'Start reading'}</button>`;
-    cont.addEventListener('click', () => openReader(next));
+    cont.addEventListener('click', () => openLesson_(next));
     pad.appendChild(cont);
   }
 
@@ -218,11 +218,67 @@ export function renderPath() {
         `<div><span class="node-t es">${esc(lesson.title)}</span>` +
         `<span class="node-d">${esc(isNow ? 'You are here' : lesson.desc)}</span></div>` +
         (isNow ? MOMO_MINI : '');
-      if (!locked) node.addEventListener('click', () => openReader(lesson));
+      if (!locked) node.addEventListener('click', () => openLesson_(lesson));
       trail.appendChild(node);
     });
 
     unlocked = lessons.every((l) => read.includes(l.id));
+  }
+}
+
+// ══ WARM-UP ═════════════════════════════════════════════════
+// Before a lesson, meet the words you are about to trip over. Each card is
+// tap-to-reveal so you get a beat to guess first, and advancing logs a real
+// exposure, so the warm-up genuinely feeds the memory model.
+let warm = null;
+
+export function openLesson_(lesson) {
+  const words = (lesson.warmup || []).filter((w) => content.dict[w]);
+  if (!words.length) return openReader(lesson);
+  warm = { lesson, words, i: 0 };
+  $('wuTitle').textContent = lesson.title;
+  showScreen('warmup');
+  paintWarmup();
+}
+
+function paintWarmup() {
+  const { words, i } = warm;
+  const word = words[i];
+  const d = content.dict[word] || {};
+  $('wuCount').textContent = `${i + 1} / ${words.length}`;
+  $('wuWord').textContent = word;
+  $('wuPos').textContent = [d.pos, d.g].filter(Boolean).join(' · ');
+  $('wuMean').textContent = d.en || '—';
+  const note = $('wuNote');
+  note.textContent = d.note || '';
+  note.classList.toggle('has', !!d.note);
+  $('wuCard').classList.remove('open');
+  $('wuNext').style.visibility = 'hidden';
+  $('wuNext').textContent = i < words.length - 1 ? 'Next word' : 'Start reading';
+
+  const dots = $('wuDots');
+  clear(dots);
+  words.forEach((_, j) => {
+    const dot = el('i');
+    if (j < i) dot.className = 'done';
+    else if (j === i) dot.className = 'now';
+    dots.appendChild(dot);
+  });
+}
+
+function revealWarmup() {
+  $('wuCard').classList.add('open');
+  $('wuNext').style.visibility = 'visible';
+  if (canAudio()) { speech.warmUp(); speech.speak(warm.words[warm.i], speakOpts()); }
+}
+
+function advanceWarmup() {
+  store.recordExposure(warm.words[warm.i]);
+  if (warm.i < warm.words.length - 1) {
+    warm.i++;
+    paintWarmup();
+  } else {
+    openReader(warm.lesson);
   }
 }
 
@@ -233,7 +289,8 @@ export function openReader(lesson) {
   const host = $('readBody');
   clear(host);
 
-  const hint = el('p', 'hint', 'Tap any word you don’t know. The underline shows how well you know it already.');
+  const hint = el('p', 'hint',
+    'Tap a sentence for the English. Tap any word for its meaning — the underline shows how well you know it.');
   host.appendChild(hint);
 
   const vocab = store.vocab.all();
@@ -264,10 +321,28 @@ export function openReader(lesson) {
       b.addEventListener('click', () => { speech.warmUp(); speech.speak(sn.es, speakOpts()); momo?.set('speak'); });
       s.appendChild(b);
     }
+    // The translation stays hidden until asked for — reading it for free is
+    // not reading. Tapping the Spanish reveals just that line.
+    s.addEventListener('click', (ev) => {
+      if (ev.target.closest('.w, .spk')) return;   // word lookups and audio win
+      p.classList.toggle('shown');
+    });
     const e = el('span', 'e', sn.en);
     p.appendChild(s); p.appendChild(e);
     host.appendChild(p);
   }
+
+  const both = el('div', 'reveal-all');
+  const showAll = el('button', null, 'Show all');
+  showAll.type = 'button';
+  showAll.addEventListener('click', () =>
+    host.querySelectorAll('.line').forEach((l) => l.classList.add('shown')));
+  const hideAll = el('button', null, 'Hide all');
+  hideAll.type = 'button';
+  hideAll.addEventListener('click', () =>
+    host.querySelectorAll('.line').forEach((l) => l.classList.remove('shown')));
+  both.appendChild(showAll); both.appendChild(hideAll);
+  host.appendChild(both);
 
   // Reading it counts: every dictionary word in the lesson is an exposure.
   const seen = new Set();
@@ -458,6 +533,9 @@ function answerScene(btn, option, opts, pad) {
 // ══ WORDS ═══════════════════════════════════════════════════
 export function renderWords() {
   paintLevel();
+  const query = ($('wordSearch')?.value || '').trim().toLowerCase();
+  if (query) return renderSearch(query);
+
   const pad = $('wordsPad');
   clear(pad);
   const vocab = store.vocab.all();
@@ -521,11 +599,153 @@ export function renderWords() {
   pad.appendChild(chips);
 }
 
+// Search your own words first, then fall through to the rest of the
+// dictionary — the original did the same, and it is how you look up a word you
+// half-heard in the street.
+function renderSearch(query) {
+  const pad = $('wordsPad');
+  clear(pad);
+  const vocab = store.vocab.all();
+  const matches = (w) => w.includes(query) || String(content.dict[w].en).toLowerCase().includes(query);
+
+  const mine = Object.keys(vocab).filter((w) => content.dict[w] && matches(w));
+  const rest = Object.keys(content.dict).filter((w) => !vocab[w] && matches(w)).slice(0, 60);
+  $('wordsSub').textContent = `${mine.length + rest.length} match${mine.length + rest.length === 1 ? '' : 'es'}`;
+
+  const section = (title, words) => {
+    if (!words.length) return;
+    const card = el('div', 'card');
+    card.innerHTML = `<p class="label">${esc(title)}</p>`;
+    for (const w of words) {
+      const d = content.dict[w];
+      const row = el('button', 'hit');
+      row.type = 'button';
+      row.innerHTML = `<span class="w es">${esc(w)}</span><span class="m">${esc(d.en)}</span>`;
+      row.addEventListener('click', () => openWordFromList(w));
+      card.appendChild(row);
+    }
+    pad.appendChild(card);
+  };
+
+  section('Your words', mine);
+  section('Rest of the dictionary', rest);
+  if (!mine.length && !rest.length) {
+    pad.appendChild(el('p', 'empty', `No matches for “${query}”.`));
+  }
+}
+
 function openWordFromList(w) {
   const d = content.dict[w];
   if (!d) return;
   toast(`<b>${esc(w)}</b> — ${esc(d.en)}${d.note ? '. ' + esc(d.note) : ''}`, 4200);
   if (canAudio()) { speech.warmUp(); speech.speak(w, speakOpts()); }
+}
+
+// ══ FLUENCY ═════════════════════════════════════════════════
+// The engine already works all of this out; this is the screen that finally
+// shows it — where the score comes from, what you have passed, what is next.
+export function renderFluency() {
+  const f = fluency();
+  const pad = $('fluencyPad');
+  clear(pad);
+  $('fluencySub').textContent = f.levelDesc;
+
+  const head = el('div', 'card center');
+  head.innerHTML =
+    `<div class="big-score">${f.overall}%</div>` +
+    `<div class="level-name es">${esc(f.level)}</div>` +
+    `<p class="sub">${esc(f.known)} words known · ${esc(f.strong)} locked in</p>`;
+  pad.appendChild(head);
+
+  if (f.next.length) {
+    const n = f.next[0];
+    const card = el('div', 'card');
+    card.innerHTML =
+      `<p class="label">Next goal</p><div class="row"><div class="big" style="font-size:19px">${esc(n.title)}</div>` +
+      `<div class="sub">${esc(n.detail)}</div></div>` +
+      `<div class="bar"><i style="width:${Math.round(n.pct * 100)}%"></i></div>`;
+    pad.appendChild(card);
+  }
+
+  const parts = [
+    ['Words you know', f.vocabScore, 35],
+    ['Practice accuracy', f.practiceAcc, 20],
+    ['Lessons read', f.storyScore, 15],
+    ['Patterns found', f.patternScore, 15],
+    ['Verbs nailed', f.verbScore, 15],
+  ];
+  const bd = el('div', 'card');
+  bd.innerHTML = '<p class="label">Score breakdown</p>';
+  const list = el('div', 'bd');
+  for (const [name, score, weight] of parts) {
+    const row = el('div', 'bd-row');
+    row.innerHTML =
+      `<span class="k">${esc(name)}</span>` +
+      `<span class="v">${Math.round(score * 100)}% of ${weight}</span>` +
+      `<span class="track"><i style="width:${Math.round(score * 100)}%"></i></span>`;
+    list.appendChild(row);
+  }
+  bd.appendChild(list);
+  pad.appendChild(bd);
+
+  const ms = el('div', 'card');
+  ms.innerHTML = `<p class="label">Milestones earned · ${f.milestones.length}</p>`;
+  if (!f.milestones.length) {
+    ms.appendChild(el('p', 'muted', 'None yet. Read a lesson and the first one arrives quickly.'));
+  }
+  for (const m of f.milestones) {
+    const row = el('div', 'ms');
+    row.innerHTML = `<span class="tick">✓</span><span><span class="t">${esc(m.title)}</span>` +
+      `<span class="d">${esc(m.detail)}</span></span>`;
+    ms.appendChild(row);
+  }
+  pad.appendChild(ms);
+}
+
+// ══ FLUENCY MAP ═════════════════════════════════════════════
+// Every word in the language as one tile, so you can see the whole mountain
+// and how much of it you have coloured in.
+export function renderMap() {
+  const pad = $('mapPad');
+  clear(pad);
+  const vocab = store.vocab.all();
+  const all = Object.keys(content.dict);
+  let seen = 0;
+
+  const grid = el('div', 'map-grid');
+  for (const w of all) {
+    const v = vocab[w];
+    const m = v ? memoryStrength(v.exposures || 0, v.lastSeen || 0) : 0;
+    const tile = el('i');
+    if (m >= 0.8) tile.className = 's3';
+    else if (m >= 0.5) tile.className = 's2';
+    else if (m > 0) tile.className = 's1';
+    if (m > 0) seen++;
+    tile.title = w;
+    grid.appendChild(tile);
+  }
+
+  const pct = all.length ? Math.round((seen / all.length) * 100) : 0;
+  $('mapSub').textContent = `${seen} of ${all.length} · ${pct}%`;
+
+  const head = el('div', 'card');
+  head.innerHTML =
+    `<div class="row"><div><div class="big">${pct}%</div>` +
+    `<div class="sub">${seen} of ${all.length} words met</div></div></div>` +
+    `<div class="bar"><i style="width:${pct}%"></i></div>`;
+  pad.appendChild(head);
+
+  const legend = el('div', 'legend');
+  legend.innerHTML =
+    '<span class="lg"><i style="background:var(--ceniza3)"></i>Unseen</span>' +
+    '<span class="lg"><i style="background:var(--barro)"></i>Fading</span>' +
+    '<span class="lg"><i style="background:var(--oro)"></i>Growing</span>' +
+    '<span class="lg"><i style="background:var(--jade)"></i>Locked in</span>';
+  pad.appendChild(legend);
+
+  const wrap = el('div', 'card');
+  wrap.appendChild(grid);
+  pad.appendChild(wrap);
 }
 
 // ══ DRILLS ══════════════════════════════════════════════════
@@ -1133,13 +1353,25 @@ function wire() {
   $('phrasesClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
   $('settingsClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
   $('gearBtn').addEventListener('click', () => { showScreen('settings'); renderSettings(); });
+  $('wuCard').addEventListener('click', revealWarmup);
+  $('wuNext').addEventListener('click', advanceWarmup);
+  $('wuClose').addEventListener('click', () => openReader(warm.lesson));
+  $('fluencyClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
+  $('mapBtn').addEventListener('click', () => { showScreen('map'); renderMap(); });
+  $('mapClose').addEventListener('click', () => { showScreen('fluency'); renderFluency(); });
+  let searchTimer = null;
+  $('wordSearch').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(renderWords, 120);
+  });
   $('langChip').addEventListener('click', () => onSwitchLanguage());
   for (const id of ['levelChip', 'levelChip2', 'levelChip3', 'levelChip4']) {
-    $(id)?.addEventListener('click', () => { showScreen('words'); renderWords(); });
+    $(id)?.addEventListener('click', () => { showScreen('fluency'); renderFluency(); });
   }
 }
 
 export const RENDERERS = {
   today: renderToday, path: renderPath, scenes: renderScenes,
   words: renderWords, patterns: renderPatterns, settings: renderSettings,
+  fluency: renderFluency, map: renderMap,
 };

@@ -1,67 +1,74 @@
 // Momo — a guardabarranco, Nicaragua's national bird.
 //
 // Real motmots swing that racket-tipped tail like a pendulum, so his idle is
-// his actual behaviour rather than an invented animation. Every state is a
-// class on the wrapper; the CSS does the moving.
+// his actual behaviour rather than an invented animation.
+//
+// The SVG appears more than once (splash and home), so every internal id is
+// suffixed per instance. Sharing ids meant `url(#mBody)` resolved into the
+// hidden splash copy and every gradient-filled shape — body, belly, wings,
+// head — silently painted nothing. Animation hooks are classes for the same
+// reason: an id can only ever drive one of them.
 
-export const MOMO_SVG = `
+export function momoSvg(uid = 'a') {
+  const g = (name) => `${name}-${uid}`;
+  return `
 <svg class="momo-svg" viewBox="0 0 220 214" aria-hidden="true">
   <defs>
-    <radialGradient id="mGlow" cx="50%" cy="46%" r="50%">
+    <radialGradient id="${g('mGlow')}" cx="50%" cy="46%" r="50%">
       <stop offset="0%" stop-color="#E8A33D" stop-opacity=".55"/>
       <stop offset="55%" stop-color="#E8A33D" stop-opacity=".16"/>
       <stop offset="100%" stop-color="#E8A33D" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="mBody" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="${g('mBody')}" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#48B79D"/><stop offset="100%" stop-color="#22685C"/>
     </linearGradient>
-    <linearGradient id="mHead" x1="0" y1="0" x2=".4" y2="1">
+    <linearGradient id="${g('mHead')}" x1="0" y1="0" x2=".4" y2="1">
       <stop offset="0%" stop-color="#4FC0A5"/><stop offset="100%" stop-color="#2A7A6B"/>
     </linearGradient>
-    <linearGradient id="mBelly" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="${g('mBelly')}" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#E0975C"/><stop offset="100%" stop-color="#B25E36"/>
     </linearGradient>
-    <linearGradient id="mBrow" x1="0" y1="0" x2="1" y2="0">
+    <linearGradient id="${g('mBrow')}" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="#8FDDEE"/><stop offset="55%" stop-color="#5FB6E0"/>
       <stop offset="100%" stop-color="#3E8FC9"/>
     </linearGradient>
-    <linearGradient id="mWing" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="${g('mWing')}" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#5FCCB0"/><stop offset="100%" stop-color="#31897A"/>
     </linearGradient>
   </defs>
 
-  <ellipse id="glow" cx="110" cy="108" rx="92" ry="94" fill="url(#mGlow)"/>
+  <ellipse class="m-glow" cx="110" cy="108" rx="92" ry="94" fill="url(#${g('mGlow')})"/>
 
   <path d="M14 170 Q110 161 206 172" stroke="#4C3B30" stroke-width="7" fill="none" stroke-linecap="round"/>
   <path d="M170 168 q13 -9 24 -6 q-11 8 -24 6z" fill="#2F6B4E"/>
   <path d="M40 170 q-13 -8 -25 -5 q11 8 25 5z" fill="#2F6B4E"/>
 
-  <g id="float">
-    <g id="tail-grp">
+  <g class="m-float">
+    <g class="m-tail">
       <path d="M104 146 C99 170 99 182 100 192" stroke="#2A7A6B" stroke-width="3.2" fill="none" stroke-linecap="round"/>
       <path d="M117 146 C122 170 122 182 121 192" stroke="#2A7A6B" stroke-width="3.2" fill="none" stroke-linecap="round"/>
-      <ellipse cx="100" cy="200" rx="7.5" ry="10.5" fill="url(#mBody)"/>
-      <ellipse cx="121" cy="200" rx="7.5" ry="10.5" fill="url(#mBody)"/>
+      <ellipse cx="100" cy="200" rx="7.5" ry="10.5" fill="url(#${g('mBody')})"/>
+      <ellipse cx="121" cy="200" rx="7.5" ry="10.5" fill="url(#${g('mBody')})"/>
       <ellipse cx="100" cy="198" rx="3.4" ry="5" fill="#5FB6E0" opacity=".65"/>
       <ellipse cx="121" cy="198" rx="3.4" ry="5" fill="#5FB6E0" opacity=".65"/>
     </g>
 
-    <ellipse id="wingL" cx="78" cy="117" rx="16" ry="29" fill="url(#mWing)"/>
-    <ellipse id="wingR" cx="142" cy="117" rx="16" ry="29" fill="url(#mWing)"/>
+    <ellipse class="m-wingL" cx="78" cy="117" rx="16" ry="29" fill="url(#${g('mWing')})"/>
+    <ellipse class="m-wingR" cx="142" cy="117" rx="16" ry="29" fill="url(#${g('mWing')})"/>
 
     <path d="M100 152 L98 168 M100 168 l-6 4 M100 168 l6 4" stroke="#D89A3C" stroke-width="3" fill="none" stroke-linecap="round"/>
     <path d="M121 152 L123 168 M123 168 l-6 4 M123 168 l6 4" stroke="#D89A3C" stroke-width="3" fill="none" stroke-linecap="round"/>
 
-    <ellipse cx="110" cy="118" rx="38" ry="42" fill="url(#mBody)"/>
-    <ellipse cx="110" cy="127" rx="26" ry="31" fill="url(#mBelly)"/>
+    <ellipse cx="110" cy="118" rx="38" ry="42" fill="url(#${g('mBody')})"/>
+    <ellipse cx="110" cy="127" rx="26" ry="31" fill="url(#${g('mBelly')})"/>
 
-    <g id="head">
-      <circle cx="110" cy="70" r="33" fill="url(#mHead)"/>
+    <g class="m-head">
+      <circle cx="110" cy="70" r="33" fill="url(#${g('mHead')})"/>
       <path d="M78 62 a33 33 0 0 1 64 0 a46 46 0 0 0 -64 0 z" fill="#63D6B6" opacity=".38"/>
       <path d="M83 88 q27 13 54 0 q-27 10 -54 0 z" fill="#C2703F" opacity=".7"/>
       <path d="M85 66 Q110 59 135 66 Q136 81 110 79 Q84 81 85 66 Z" fill="#1E1512"/>
-      <path d="M87 60 Q97 53.5 106 58.5" stroke="url(#mBrow)" stroke-width="5.4" fill="none" stroke-linecap="round"/>
-      <path d="M114 58.5 Q123 53.5 133 60" stroke="url(#mBrow)" stroke-width="5.4" fill="none" stroke-linecap="round"/>
+      <path d="M87 60 Q97 53.5 106 58.5" stroke="url(#${g('mBrow')})" stroke-width="5.4" fill="none" stroke-linecap="round"/>
+      <path d="M114 58.5 Q123 53.5 133 60" stroke="url(#${g('mBrow')})" stroke-width="5.4" fill="none" stroke-linecap="round"/>
       <circle cx="98" cy="70" r="8.6" fill="#F6EFE2"/>
       <circle cx="122" cy="70" r="8.6" fill="#F6EFE2"/>
       <circle cx="99.4" cy="71" r="4.5" fill="#14100E"/>
@@ -71,7 +78,7 @@ export const MOMO_SVG = `
       <rect class="lid" x="89.4" y="61.3" width="17.2" height="17.6" rx="8.6" fill="#1E1512"/>
       <rect class="lid" x="113.4" y="61.3" width="17.2" height="17.6" rx="8.6" fill="#1E1512"/>
       <path d="M99 83 Q110 78.5 121 83 L110 90.5 Z" fill="#584234"/>
-      <path id="beak" d="M100 84.5 L120 84.5 L110 103 Z" fill="#2A1E17"/>
+      <path class="m-beak" d="M100 84.5 L120 84.5 L110 103 Z" fill="#2A1E17"/>
       <g class="zzz">
         <text x="146" y="46" font-size="15" font-weight="700" fill="#A99C8E">z</text>
         <text x="158" y="34" font-size="11" font-weight="700" fill="#6E635A">z</text>
@@ -79,8 +86,10 @@ export const MOMO_SVG = `
     </g>
   </g>
 </svg>`;
+}
 
-// A smaller, still Momo, for marking where you are on the path.
+// A smaller, still Momo, for marking where you are on the path. Flat colours
+// only, so it needs no ids at all and can repeat freely.
 export const MOMO_MINI = `
 <svg class="mini-momo" viewBox="0 0 60 60" aria-hidden="true">
   <ellipse cx="30" cy="42" rx="4" ry="7" fill="#22685C"/>
@@ -95,7 +104,6 @@ export const MOMO_MINI = `
   <path d="M26 18 L34 18 L30 25 Z" fill="#2A1E17"/>
 </svg>`;
 
-const STATES = ['happy', 'wrong', 'cheer', 'speak', 'sleep'];
 const IDLE_AFTER_MS = 45000;
 
 export function createMomo(hostEl, speechEl, sparksEl) {
@@ -152,7 +160,6 @@ export function createMomo(hostEl, speechEl, sparksEl) {
     armIdle();
   }
 
-  // Tapping him should always do something, and not the same thing twice.
   const POKES = [
     ['happy', '¡Ideay! ¿Qué tal?'],
     ['speak', 'Escuchá bien'],
@@ -176,6 +183,5 @@ export function createMomo(hostEl, speechEl, sparksEl) {
     say,
     react: (correct, msg) => set(correct ? 'happy' : 'wrong', msg),
     celebrate: (msg) => set('cheer', msg),
-    states: STATES,
   };
 }

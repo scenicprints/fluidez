@@ -8,7 +8,7 @@ import * as store from './store.js';
 import * as authLib from './auth.js';
 import * as cloud from './cloud.js';
 import { content, loadLanguages, findLanguage, loadCachedPack, checkForContentUpdate } from './content.js';
-import { MOMO_SVG, createMomo } from './momo.js';
+import { momoSvg, createMomo } from './momo.js';
 import { startSetup, splashSays, showLanguagePicker, adoptAccount } from './setup.js';
 import * as screens from './screens.js';
 
@@ -127,7 +127,7 @@ function launch(account, { celebrate = false } = {}) {
     store.setUser(session.userId);
   }
   if (!momo) {
-    $('momo').innerHTML = MOMO_SVG;
+    $('momo').innerHTML = momoSvg('home');
     momo = createMomo($('momo'), $('speech'), $('sparks'));
   }
   enterApp();
@@ -157,7 +157,7 @@ function enterApp() {
 // ── boot ────────────────────────────────────────────────────
 async function boot() {
   showPane('splash');
-  $('splashMomo').innerHTML = MOMO_SVG;
+  $('splashMomo').innerHTML = momoSvg('splash');
 
   const v = await readVersion();
   knownVersion = v?.version || null;
