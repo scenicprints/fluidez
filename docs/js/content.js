@@ -162,6 +162,47 @@ export function packVersion(code) {
  * something honest rather than an indeterminate spinner.
  */
 export async function downloadPack(lang, onProgress = () => {}) {
+  // Fast path: the content repo's CI bundles the whole course into one file.
+  // Fetching it as 123 separate files took over two minutes on a good
+  // connection, which is not a first run anyone should have on mobile data.
+  try {
+    onProgress({ phase: 'manifest', done: 0, total: 1 });
+    const bundle = await getJson(`${rawBase(lang)}/pack.json`);
+    if (bundle && bundle.lessons) return applyBundle(lang, bundle, onProgress);
+  } catch {
+    // No pack.json yet — fall through and assemble it file by file.
+  }
+  return downloadPackFileByFile(lang, onProgress);
+}
+
+/** The bundled course: one request, then straight into local storage. */
+function applyBundle(lang, bundle, onProgress) {
+  const manifest = {
+    version: bundle.version ?? null,
+    features: bundle.features || null,
+    emergency: bundle.emergency ? true : null,
+    emergencyData: bundle.emergency || null,
+    lessons: bundle.lessons,
+    scenarios: bundle.scenarios,
+  };
+  const pack = {
+    language: { ...lang, speech: bundle.speech || lang.speech || null },
+    manifest,
+    dict: bundle.dictionary || {},
+    patterns: bundle.patterns || [],
+    lessons: (bundle.lessons || []).map(asLesson),
+    scenarios: (bundle.scenarios || []).map(asScenario),
+    verbs: bundle.verbs || null,
+    fetchedAt: Date.now(),
+  };
+  applyPack(pack);
+  const stored = cacheWrite(CK.pack(lang.code), pack);
+  const total = pack.lessons.length + pack.scenarios.length;
+  onProgress({ phase: 'done', done: total, total, stored });
+  return { pack, stored };
+}
+
+async function downloadPackFileByFile(lang, onProgress = () => {}) {
   const base = rawBase(lang);
   onProgress({ phase: 'manifest', done: 0, total: 1 });
   const manifest = await getJson(`${base}/manifest.json`);
@@ -241,9 +282,15 @@ export async function downloadPack(lang, onProgress = () => {}) {
  * touching the app.
  */
 export async function checkForContentUpdate(lang) {
+  const have = packVersion(lang.code);
+  // A ~60 byte sidecar, so this can run on every launch without costing data.
+  try {
+    const v = await getJson(`${rawBase(lang)}/version.json`);
+    const remote = v.version ?? null;
+    return { available: remote !== null && remote !== have, have, remote };
+  } catch { /* older content — fall back to the manifest */ }
   try {
     const manifest = await getJson(`${rawBase(lang)}/manifest.json`);
-    const have = packVersion(lang.code);
     const remote = manifest.version ?? null;
     return { available: remote !== null && remote !== have, have, remote };
   } catch {
