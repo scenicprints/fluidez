@@ -23,11 +23,26 @@ const FALLBACK_LANGUAGE = {
   branch: 'main',
 };
 
-const languagesUrl = () =>
-  `https://raw.githubusercontent.com/${REGISTRY.user}/${REGISTRY.repo}/${REGISTRY.branch}/languages.json`;
+const registryUrls = () => [
+  `https://raw.githubusercontent.com/${REGISTRY.user}/${REGISTRY.repo}/${REGISTRY.branch}/languages.json`,
+  `https://cdn.jsdelivr.net/gh/${REGISTRY.user}/${REGISTRY.repo}@${REGISTRY.branch}/languages.json`,
+];
 
-const rawBase = (lang) =>
-  `https://raw.githubusercontent.com/${lang.user}/${lang.repo}/${lang.branch || 'main'}/content`;
+// Two ways to reach the same files. raw.githubusercontent is always current,
+// which is what makes "push a lesson and it appears" true — but it rate-limits
+// by IP and answers 429, which would strand a whole household on one wifi.
+// jsDelivr mirrors the same repo with no such limit, at the cost of caching a
+// branch for a few hours. So: raw first for freshness, CDN as the safety net.
+const contentBases = (lang) => {
+  const { user, repo } = lang;
+  const branch = lang.branch || 'main';
+  return [
+    `https://raw.githubusercontent.com/${user}/${repo}/${branch}/content`,
+    `https://cdn.jsdelivr.net/gh/${user}/${repo}@${branch}/content`,
+  ];
+};
+
+const rawBase = (lang) => contentBases(lang)[0];
 
 // Every feature the app can offer. A language's manifest lists the ones it
 // actually supports; anything not listed simply never appears. That is how
@@ -54,6 +69,19 @@ async function getJson(url, timeoutMs = 20000) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Same file, whichever host will serve it. */
+async function getContent(lang, path, timeoutMs = 20000) {
+  let lastError;
+  for (const base of contentBases(lang)) {
+    try {
+      return await getJson(`${base}/${path}`, timeoutMs);
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError || new Error(`could not fetch ${path}`);
 }
 
 function cacheRead(k) {
@@ -96,8 +124,11 @@ export async function loadLanguages({ allowNetwork = true, timeoutMs = 6000 } = 
   if (cached) content.languages = cached;
   if (!allowNetwork) return content.languages;
   try {
-    const doc = await getJson(languagesUrl(), timeoutMs);
-    const list = Array.isArray(doc) ? doc : doc.languages;
+    let doc = null;
+    for (const url of registryUrls()) {
+      try { doc = await getJson(url, timeoutMs); break; } catch {}
+    }
+    const list = Array.isArray(doc) ? doc : doc && doc.languages;
     if (Array.isArray(list) && list.length) {
       content.languages = list;
       cacheWrite(CK.languages, list);
@@ -177,7 +208,7 @@ export async function downloadPack(lang, onProgress = () => {}) {
   // connection, which is not a first run anyone should have on mobile data.
   try {
     onProgress({ phase: 'manifest', done: 0, total: 1 });
-    const bundle = await getJson(`${rawBase(lang)}/pack.json`);
+    const bundle = await getContent(lang, 'pack.json');
     if (bundle && bundle.lessons) return applyBundle(lang, bundle, onProgress);
   } catch {
     // No pack.json yet — fall through and assemble it file by file.
@@ -215,7 +246,7 @@ function applyBundle(lang, bundle, onProgress) {
 async function downloadPackFileByFile(lang, onProgress = () => {}) {
   const base = rawBase(lang);
   onProgress({ phase: 'manifest', done: 0, total: 1 });
-  const manifest = await getJson(`${base}/manifest.json`);
+  const manifest = await getContent(lang, 'manifest.json');
 
   const dictFiles = manifest.dictionary || [];
   const patternFiles = manifest.patterns || [];
@@ -242,7 +273,7 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
   const dict = {};
   for (const f of dictFiles) {
     try {
-      const part = await getJson(`${base}/${f}`);
+      const part = await getContent(lang, f);
       Object.assign(dict, part);
     } catch {}
     step();
@@ -251,7 +282,7 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
   const patterns = [];
   for (const f of patternFiles) {
     try {
-      const part = await getJson(`${base}/${f}`);
+      const part = await getContent(lang, f);
       patterns.push(...(Array.isArray(part) ? part : [part]));
     } catch {}
     step();
@@ -259,7 +290,7 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
 
   const lessons = (await batched(lessonEntries, async (entry) => {
     try {
-      const j = await getJson(`${base}/${entry.path}`);
+      const j = await getContent(lang, entry.path);
       return asLesson({ ...entry, ...j });
     } catch { return null; }
     finally { step(); }
@@ -267,7 +298,7 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
 
   const scenarios = (await batched(scenarioEntries, async (entry) => {
     try {
-      const j = await getJson(`${base}/${entry.path}`);
+      const j = await getContent(lang, entry.path);
       return asScenario({ ...entry, ...j });
     } catch { return null; }
     finally { step(); }
@@ -275,7 +306,7 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
 
   let verbs = null;
   if (wantsVerbs) {
-    try { verbs = await getJson(`${base}/${manifest.verbs}`); } catch {}
+    try { verbs = await getContent(lang, manifest.verbs); } catch {}
     step();
   }
 
@@ -295,12 +326,12 @@ export async function checkForContentUpdate(lang) {
   const have = packVersion(lang.code);
   // A ~60 byte sidecar, so this can run on every launch without costing data.
   try {
-    const v = await getJson(`${rawBase(lang)}/version.json`);
+    const v = await getContent(lang, 'version.json', 8000);
     const remote = v.version ?? null;
     return { available: remote !== null && remote !== have, have, remote };
   } catch { /* older content — fall back to the manifest */ }
   try {
-    const manifest = await getJson(`${rawBase(lang)}/manifest.json`);
+    const manifest = await getContent(lang, 'manifest.json', 8000);
     const remote = manifest.version ?? null;
     return { available: remote !== null && remote !== have, have, remote };
   } catch {
