@@ -73,7 +73,13 @@ async function registerWorker() {
     return null;
   }
   try {
-    const reg = await navigator.serviceWorker.register('sw.js', { scope: './' });
+    // updateViaCache:'none' keeps sw.js itself out of the HTTP cache. Without
+    // it the browser can serve a stale worker script for as long as Pages'
+    // max-age lasts, so a deploy sits unnoticed behind the old worker.
+    const reg = await navigator.serviceWorker.register('sw.js', {
+      scope: './',
+      updateViaCache: 'none',
+    });
 
     // A newer worker may already be sitting there from a previous visit —
     // without this it waits forever and the app never actually updates.
