@@ -10,7 +10,12 @@
  * because on the phone this actually ships to, hover does not exist.
  */
 
+/* Declaring the scheme stops Android Chrome's auto-dark theme from
+ * force-darkening a page that is already dark, which inverted every
+ * near-black — Momo's mask, pupils, beak and his branch — to white. */
 :root {
+  color-scheme: dark;
+
   --basalt: #14100E; --basalt2: #0D0A09;
   --ceniza: #201A18; --ceniza2: #2C2422; --ceniza3: #382E2A;
   --linea: #3A302C;

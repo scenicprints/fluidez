@@ -21,6 +21,16 @@ let momo = null;
 // hand in three places, which is exactly how this went wrong before.
 
 const VERSION_URL = 'version.json';
+
+// The version of the code ACTUALLY RUNNING, read from this module's own URL
+// (CI stamps ?v=<version> onto it). version.json reports what the server has,
+// which is a different question — and when a stale worker is serving old
+// JavaScript the two disagree, which is precisely what needs surfacing.
+const RUNNING_VERSION = (() => {
+  try { return new URL(import.meta.url).searchParams.get('v') || 'dev'; }
+  catch { return 'dev'; }
+})();
+
 let knownVersion = null;
 
 async function readVersion() {
@@ -115,12 +125,8 @@ async function registerWorker() {
 async function pollVersion() {
   const v = await readVersion();
   if (!v?.version) return;
-  if (!knownVersion) {
-    knownVersion = v.version;
-    window.__FLUIDEZ_VERSION__ = v.version;
-    return;
-  }
-  if (v.version !== knownVersion) {
+  knownVersion = v.version;
+  if (v.version !== RUNNING_VERSION) {
     const reg = await navigator.serviceWorker?.getRegistration();
     await reg?.update();
     showUpdateBanner(`Version ${v.version} is ready`);
@@ -194,7 +200,13 @@ async function boot() {
 
   const v = await readVersion();
   knownVersion = v?.version || null;
-  window.__FLUIDEZ_VERSION__ = knownVersion || 'dev';
+  window.__FLUIDEZ_VERSION__ = RUNNING_VERSION;
+  // On screen, so "it updated but looks the same" is answerable at a glance.
+  const stale = knownVersion && knownVersion !== RUNNING_VERSION;
+  for (const id of ['splashVer', 'loginVer']) {
+    const n = $(id);
+    if (n) n.textContent = stale ? `v${RUNNING_VERSION} — update ready` : `v${RUNNING_VERSION}`;
+  }
 
   registerWorker();
   setInterval(pollVersion, 15 * 60 * 1000);
