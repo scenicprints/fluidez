@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paths the ota_update FileProvider is allowed to hand to the system
+     installer. Covers where the downloaded APK lands. -->
+<paths>
+    <external-files-path name="ota_update" path="." />
+    <files-path name="ota_files" path="." />
+    <cache-path name="ota_cache" path="." />
+</paths>

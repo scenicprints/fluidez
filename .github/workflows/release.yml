@@ -1,0 +1,87 @@
+name: Build & Release APK
+
+# Runs whenever a version tag (e.g. v2.0.1) is pushed.
+#
+# Only the Android shell lives here — the app itself is the web app in docs/,
+# which deploys on every push. This should almost never need to run.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # needed to create the GitHub Release
+
+defaults:
+  run:
+    # The Flutter project sits under shell/, not the repo root.
+    working-directory: shell
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Restore signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+      # The tag is the truth for the version, NOT pubspec.yaml. On Foos, v1.0.1
+      # was tagged on a commit whose pubspec still said 1.0.0, so the APK
+      # identified as 1.0.0 and the in-app updater offered 1.0.1 forever.
+      # --build-name from the tag makes that impossible; the run number keeps
+      # versionCode monotonically increasing for Android.
+      - name: Build release APK
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          flutter build apk --release \
+            --build-name="$VERSION" \
+            --build-number="${GITHUB_RUN_NUMBER}"
+
+      - name: Rename APK to versioned name
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp build/app/outputs/flutter-apk/app-release.apk "fluidez-${VERSION}.apk"
+
+      - name: Extract release notes from tag message
+        run: git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > RELEASE_NOTES.txt
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.txt
+          files: shell/fluidez-*.apk
