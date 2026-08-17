@@ -212,10 +212,13 @@ async function paintBoard() {
   const ahead = rows
     .filter((r) => r.id !== session.userId && Number(r.streak || 0) > myStreak)
     .sort((a, b) => Number(b.streak || 0) - Number(a.streak || 0))[0];
+  // A name, a flame and a number — no sentence. Momo does not speak English,
+  // and "is ahead — 1 days" was both wrong grammar and the wrong language.
+  // The dismayed pose carries the meaning; the numbers carry the rest.
   if (ahead && store.momoSeen.mark(`ahead:${ahead.id}:${Number(ahead.streak || 0)}`)) {
     const name = esc(ahead.name || ahead.id);
     const days = Number(ahead.streak || 0);
-    setTimeout(() => momo?.set('wrong', `<b>${name}</b> is ahead — ${days} days`), 1400);
+    setTimeout(() => momo?.set('wrong', `<b>${name}</b> · 🔥 ${days}`), 1400);
   }
 
   for (const r of rows) {
@@ -227,7 +230,7 @@ async function paintBoard() {
       `<div class="an">${esc(mine ? 'You' : (r.name || r.id))}</div>` +
       `<div class="as">🔥 ${Number(r.streak || 0)}</div>`;
     a.addEventListener('click', () =>
-      momo?.say(`<b>${esc(r.name || r.id)}</b> — ${Number(r.streak || 0)} day streak, ${esc(r.level || 'A0')}`));
+      momo?.say(`<b>${esc(r.name || r.id)}</b> · 🔥 ${Number(r.streak || 0)} · ${esc(r.level || 'A0')}`));
     host.appendChild(a);
   }
 }
@@ -863,7 +866,9 @@ export function momoQuiz() {
   const vocab = store.vocab.all();
   const pool = Object.keys(vocab).filter((w) => content.dict[w] && (vocab[w].exposures || 0) >= 2);
   if (!pool.length) {
-    momo.set('speak', 'Read a lesson first');
+    // Guidance is the app talking, not the bird. His bubble stays in the
+    // language you are learning.
+    toast('Read a lesson first — then he can test you on it.');
     return;
   }
   quizWord = pool[Math.floor(Math.random() * pool.length)];
