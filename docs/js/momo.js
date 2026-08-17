@@ -66,17 +66,17 @@ export function momoSvg(uid = 'a') {
       <circle cx="110" cy="70" r="33" fill="url(#${g('mHead')})"/>
       <path d="M78 62 a33 33 0 0 1 64 0 a46 46 0 0 0 -64 0 z" fill="#63D6B6" opacity=".38"/>
       <path d="M83 88 q27 13 54 0 q-27 10 -54 0 z" fill="#C2703F" opacity=".7"/>
-      <path d="M85 66 Q110 59 135 66 Q136 81 110 79 Q84 81 85 66 Z" fill="#1E1512"/>
+      <path d="M80 64 Q110 54 140 64 Q142 86 110 84 Q78 86 80 64 Z" fill="#1E1512"/>
       <path d="M87 60 Q97 53.5 106 58.5" stroke="url(#${g('mBrow')})" stroke-width="5.4" fill="none" stroke-linecap="round"/>
       <path d="M114 58.5 Q123 53.5 133 60" stroke="url(#${g('mBrow')})" stroke-width="5.4" fill="none" stroke-linecap="round"/>
-      <circle cx="98" cy="70" r="8.6" fill="#F6EFE2"/>
-      <circle cx="122" cy="70" r="8.6" fill="#F6EFE2"/>
-      <circle cx="99.4" cy="71" r="4.5" fill="#14100E"/>
-      <circle cx="123.4" cy="71" r="4.5" fill="#14100E"/>
-      <circle cx="101.2" cy="68.6" r="1.8" fill="#FFFFFF"/>
-      <circle cx="125.2" cy="68.6" r="1.8" fill="#FFFFFF"/>
-      <rect class="lid" x="89.4" y="61.3" width="17.2" height="17.6" rx="8.6" fill="#1E1512"/>
-      <rect class="lid" x="113.4" y="61.3" width="17.2" height="17.6" rx="8.6" fill="#1E1512"/>
+      <circle cx="98" cy="72" r="8.4" fill="#F6EFE2"/>
+      <circle cx="122" cy="72" r="8.4" fill="#F6EFE2"/>
+      <circle cx="99.4" cy="73" r="4.4" fill="#14100E"/>
+      <circle cx="123.4" cy="73" r="4.4" fill="#14100E"/>
+      <circle cx="101.2" cy="70.6" r="1.8" fill="#FFFFFF"/>
+      <circle cx="125.2" cy="70.6" r="1.8" fill="#FFFFFF"/>
+      <rect class="lid" x="89.6" y="63.6" width="16.8" height="17.2" rx="8.4" fill="#1E1512"/>
+      <rect class="lid" x="113.6" y="63.6" width="16.8" height="17.2" rx="8.4" fill="#1E1512"/>
       <path d="M99 83 Q110 78.5 121 83 L110 90.5 Z" fill="#584234"/>
       <path class="m-beak" d="M100 84.5 L120 84.5 L110 103 Z" fill="#2A1E17"/>
       <g class="zzz">
@@ -98,7 +98,7 @@ export const MOMO_MINI = `
   <ellipse cx="30" cy="27" rx="8" ry="10" fill="#B25E36"/>
   <circle cx="30" cy="12" r="10" fill="#4FC0A5"/>
   <path d="M22 8 Q30 3 38 8" stroke="#5FB6E0" stroke-width="3" fill="none" stroke-linecap="round"/>
-  <path d="M21 12 Q30 9 39 12 Q39 18 30 17 Q21 18 21 12 Z" fill="#1E1512"/>
+  <path d="M20 11 Q30 7 40 11 Q41 19 30 18 Q19 19 20 11 Z" fill="#1E1512"/>
   <circle cx="26" cy="13" r="2.6" fill="#F6EFE2"/><circle cx="34" cy="13" r="2.6" fill="#F6EFE2"/>
   <circle cx="26.6" cy="13.6" r="1.4" fill="#14100E"/><circle cx="34.6" cy="13.6" r="1.4" fill="#14100E"/>
   <path d="M26 18 L34 18 L30 25 Z" fill="#2A1E17"/>
