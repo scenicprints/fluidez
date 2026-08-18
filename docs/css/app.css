@@ -473,6 +473,24 @@ button { font-family: inherit; color: inherit; }
 .scene-r.played .scene-t { color: var(--txt2); }
 @media (hover: hover) { .scene-r:hover { background: var(--ceniza2); } }
 
+/* ── a friend ──────────────────────────────────────────── */
+#friendPad > * + * { margin-top: 11px; }
+.av.xl { width: 72px; height: 72px; font-size: 27px; border-color: var(--oro-d); color: var(--oro); margin-bottom: 10px; }
+.fr-name { font-size: 20px; font-weight: 700; }
+
+/* Head to head. The bar is the split itself — your share against theirs — so
+ * there is no percentage to decode, just which side is longer. */
+.vs-who { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 12px; }
+.vs-me { color: var(--oro); }
+.vs-them { color: var(--cielo); }
+.vs + .vs { margin-top: 15px; }
+.vs-k { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--txt3); }
+.vs-n { display: flex; justify-content: space-between; align-items: baseline; margin: 3px 0 5px; font-variant-numeric: tabular-nums; }
+.vs-n span { font-size: 18px; font-weight: 700; color: var(--txt2); }
+.vs-n span.win { color: var(--txt); font-size: 21px; }
+.vs-bar { height: 6px; border-radius: 99px; overflow: hidden; background: var(--cielo); display: flex; }
+.vs-bar i { display: block; height: 100%; background: var(--oro); border-right: 2px solid var(--ceniza); transition: width .35s; }
+
 /* ── reader (paper) ────────────────────────────────────── */
 .paper { background: var(--papel); color: var(--tinta); flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .paper-top {

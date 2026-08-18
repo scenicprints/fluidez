@@ -102,6 +102,12 @@ const LEVELS = [
   [0.1, 'A1', 'Starter — learning core words'],
 ];
 
+// The same ladder, ascending, so two people's levels can be ranked against
+// each other. A0 is the implicit floor below the first threshold, and anything
+// unrecognised sorts there too rather than throwing.
+export const LEVEL_ORDER = ['A0', 'A1', 'A1+', 'A2', 'A2+', 'B1'];
+export const levelRank = (name) => Math.max(0, LEVEL_ORDER.indexOf(name));
+
 export function calcFluency(vocab, progress, unlockedPatterns, totals) {
   const now = Date.now();
   let known = 0;

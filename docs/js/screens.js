@@ -12,7 +12,7 @@ import { MOMO_MINI, momoSvg, createMomo, daysBetween } from './momo.js';
 import {
   memoryStrength, band, calcFluency, fadingWords, leeches, tokenize, cleanWord,
   conjugate, generateExercises, gradeTyped, orderCandidates, scramble, shuffle, pick,
-  phaseName, phaseDesc,
+  phaseName, phaseDesc, levelRank,
 } from './engine.js';
 
 let momo = null;
@@ -229,8 +229,7 @@ async function paintBoard() {
       `<div class="av">${esc(initials(r.name))}</div>` +
       `<div class="an">${esc(mine ? 'You' : (r.name || r.id))}</div>` +
       `<div class="as">🔥 ${Number(r.streak || 0)}</div>`;
-    a.addEventListener('click', () =>
-      momo?.say(`<b>${esc(r.name || r.id)}</b> · 🔥 ${Number(r.streak || 0)} · ${esc(r.level || 'A0')}`));
+    a.addEventListener('click', () => openFriend(r));
     host.appendChild(a);
   }
 }
@@ -467,6 +466,116 @@ function checkPatterns() {
       pending.patterns.push(p.title);
     }
   }
+}
+
+// ══ A FRIEND ═══════════════════════════════════════════════
+// Tapping someone on the streak board used to pop a one-line speech bubble.
+// This is the same information given room, plus a head to head, built only
+// from what that person published to the board — a board row carries a name,
+// a streak, a level, a word count and a date, and never their vocabulary.
+let friendRow = null;
+let comparing = false;
+
+export function openFriend(row) {
+  friendRow = row;
+  comparing = false;
+  showScreen('friend');
+  renderFriend();
+}
+
+/** "Active today" reads better than a date, and is the thing you want to know. */
+function activeText(stamp) {
+  if (!stamp) return 'Not started yet';
+  const d = daysBetween(stamp);
+  if (d === 0) return 'Active today';
+  if (d === 1) return 'Active yesterday';
+  if (d < 7) return `Active ${d} days ago`;
+  if (d < 14) return 'Active last week';
+  return `Active ${Math.floor(d / 7)} weeks ago`;
+}
+
+export function renderFriend() {
+  const r = friendRow;
+  if (!r) { showScreen('today'); return renderToday(); }
+  const mine = r.id === session.userId;
+  const who = mine ? 'You' : (r.name || r.id);
+  const lang = content.languages.find((l) => l.code === r.language);
+
+  $('friendName').textContent = who;
+  $('friendSub').textContent = lang ? `${lang.flag || ''} ${lang.name}` : (r.language || '');
+
+  const pad = $('friendPad');
+  clear(pad);
+
+  const head = el('div', 'card center');
+  head.innerHTML =
+    `<div class="av xl">${esc(initials(r.name || r.id))}</div>` +
+    `<div class="fr-name">${esc(who)}</div>` +
+    `<p class="sub" style="margin:4px 0 0">${esc(activeText(r.lastActive))}</p>`;
+  pad.appendChild(head);
+
+  const stats = el('div', 'stats3');
+  stats.innerHTML =
+    `<div class="stat"><div class="v" style="color:var(--oro)">${Number(r.streak || 0)}</div><div class="k">Day streak</div></div>` +
+    `<div class="stat"><div class="v" style="color:var(--jade)">${Number(r.known || 0)}</div><div class="k">Words known</div></div>` +
+    `<div class="stat"><div class="v" style="color:var(--cielo)">${esc(r.level || 'A0')}</div><div class="k">Level</div></div>`;
+  pad.appendChild(stats);
+
+  if (mine) {
+    const note = el('p', 'muted center', 'This is your own row, as your friends see it.');
+    note.style.marginTop = '4px';
+    pad.appendChild(note);
+    return;
+  }
+
+  const btn = el('button', 'go' + (comparing ? ' ghost' : ''));
+  btn.type = 'button';
+  btn.textContent = comparing ? 'Hide comparison' : 'Compare with me';
+  btn.addEventListener('click', () => { comparing = !comparing; renderFriend(); });
+  pad.appendChild(btn);
+
+  if (comparing) pad.appendChild(headToHead(r));
+}
+
+function headToHead(r) {
+  const f = fluency();
+  const mine = { streak: store.daily.streak(), known: f.known, level: f.level };
+  const them = {
+    streak: Number(r.streak || 0),
+    known: Number(r.known || 0),
+    level: r.level || 'A0',
+  };
+  const theirName = esc(r.name || r.id);
+
+  const box = el('div', 'card');
+  box.innerHTML =
+    '<p class="label">Head to head</p>' +
+    `<div class="vs-who"><span class="vs-me">You</span><span class="vs-them">${theirName}</span></div>` +
+    versus('Day streak', mine.streak, them.streak) +
+    versus('Words known', mine.known, them.known) +
+    versus('Level', mine.level, them.level, levelRank(mine.level), levelRank(them.level));
+  return box;
+}
+
+/**
+ * One metric, two people. The bar is the share of the total, so the split
+ * itself is the comparison — no percentages to read. `wa`/`wb` let a
+ * non-numeric value like a CEFR level be weighed by its rank instead.
+ */
+function versus(label, a, b, wa = a, wb = b) {
+  const total = (Number(wa) || 0) + (Number(wb) || 0);
+  const share = total ? Math.round(((Number(wa) || 0) / total) * 100) : 50;
+  const lead = wa === wb ? '' : (Number(wa) > Number(wb) ? 'a' : 'b');
+  return (
+    '<div class="vs">' +
+      `<div class="vs-k">${esc(label)}</div>` +
+      '<div class="vs-n">' +
+        `<span class="${lead === 'a' ? 'win' : ''}">${esc(a)}</span>` +
+        `<span class="${lead === 'b' ? 'win' : ''}">${esc(b)}</span>` +
+      '</div>' +
+      `<div class="vs-bar"><i style="width:${share}%"></i></div>` +
+    '</div>'
+  );
 }
 
 // ══ SCENES ══════════════════════════════════════════════════
@@ -1591,6 +1700,7 @@ function wire() {
   $('wuNext').addEventListener('click', advanceWarmup);
   $('wuClose').addEventListener('click', () => openReader(warm.lesson));
   $('fluencyClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
+  $('friendClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
   $('mapBtn').addEventListener('click', () => { showScreen('map'); renderMap(); });
   $('mapClose').addEventListener('click', () => { showScreen('fluency'); renderFluency(); });
   let searchTimer = null;
