@@ -1,0 +1,730 @@
+<title>Granada</title>
+
+<style>
+/* Fluidez — Granada.
+   The WORLD is daytime Granada: painted colonial facades, terracotta roofs,
+   the lake. The INTERFACE is volcanic night, straight out of docs/css/app.css.
+   Spanish is always serif, English is always sans. */
+:root {
+  color-scheme: dark;
+  --basalt: #14100E; --basalt2: #0D0A09;
+  --ceniza: #201A18; --ceniza2: #2C2422;
+  --linea: #3A302C;
+  --oro: #E8A33D; --oro-d: #8A5F1E;
+  --jade: #34B396; --jade-d: #1C5F50;
+  --barro: #D9613F; --barro-d: #75301D;
+  --papel: #F4E9D6;
+  --txt: #EFE7DC; --txt2: #A99C8E; --txt3: #6E635A;
+  --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  margin: 0; padding: 20px 14px 36px; background: var(--basalt2); color: var(--txt);
+  font-family: var(--sans); -webkit-font-smoothing: antialiased;
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+  user-select: none;
+}
+.es { font-family: var(--serif); }
+
+.masthead { text-align: center; max-width: 38rem; display: flex; flex-direction: column; gap: 6px; }
+.masthead h1 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: clamp(25px,6vw,33px); color: var(--oro); }
+.masthead p { margin: 0; color: var(--txt2); font-size: 13.5px; line-height: 1.5; }
+
+/* ── the phone ───────────────────────────────────────── */
+.phone {
+  width: 100%; max-width: 392px; height: 720px; position: relative;
+  background: #0A0807; border: 1px solid var(--linea); border-radius: 30px;
+  overflow: hidden; box-shadow: 0 26px 70px rgba(0,0,0,.6), 0 0 0 7px #080605;
+  display: flex; flex-direction: column; touch-action: none;
+}
+
+/* HUD */
+.hud {
+  flex: none; z-index: 3; padding: 12px 15px 10px;
+  background: linear-gradient(#14100EF2, #14100EE0);
+  border-bottom: 1px solid var(--linea);
+  display: flex; align-items: center; gap: 10px;
+}
+.hud .quest { flex: 1; min-width: 0; }
+.hud .lab { font-size: 9.5px; letter-spacing: .11em; text-transform: uppercase; color: var(--oro); }
+.hud .goal { font-size: 13.5px; color: var(--txt); margin-top: 2px; line-height: 1.25; }
+.hud .wc { font-size: 11.5px; color: var(--txt2); text-align: right; line-height: 1.3; font-variant-numeric: tabular-nums; flex: none; }
+.hud .wc b { color: var(--jade); display: block; font-size: 16px; font-weight: 700; }
+
+/* world */
+.stage { position: relative; flex: 1; min-height: 0; background: #6E5B45; }
+canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+.prompt {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  background: #14100EE8; border: 1px solid var(--oro-d); border-radius: 12px;
+  padding: 8px 14px; font-size: 13px; color: var(--papel); white-space: nowrap;
+  opacity: 0; transition: opacity .18s; pointer-events: none; z-index: 2;
+}
+.prompt.on { opacity: 1; }
+.prompt b { color: var(--oro); }
+
+/* controls */
+.pad { flex: none; z-index: 3; padding: 12px 16px 16px; display: flex; align-items: center; justify-content: space-between; background: var(--basalt); border-top: 1px solid var(--linea); }
+.dpad { display: grid; grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 42px); }
+.dbtn {
+  border: 1px solid var(--linea); background: var(--ceniza); color: var(--txt2);
+  font: inherit; font-size: 15px; cursor: pointer; display: grid; place-items: center;
+}
+.dbtn:active, .dbtn.held { background: var(--ceniza2); color: var(--oro); }
+.dbtn.u { grid-area: 1/2; border-radius: 10px 10px 0 0; }
+.dbtn.l { grid-area: 2/1; border-radius: 10px 0 0 10px; }
+.dbtn.r { grid-area: 2/3; border-radius: 0 10px 10px 0; }
+.dbtn.d { grid-area: 3/2; border-radius: 0 0 10px 10px; }
+.dmid { grid-area: 2/2; background: var(--ceniza); border-top: 1px solid var(--linea); border-bottom: 1px solid var(--linea); }
+.abtn {
+  width: 74px; height: 74px; border-radius: 50%; border: 1px solid var(--oro-d);
+  background: radial-gradient(circle at 34% 30%, #3A2A14, #1B1410);
+  color: var(--txt3); font: inherit; font-size: 12px; font-weight: 700; letter-spacing: .08em;
+  cursor: pointer; text-transform: uppercase;
+}
+.abtn.live { color: var(--oro); border-color: var(--oro); box-shadow: 0 0 0 4px rgba(232,163,61,.13); }
+.abtn:focus-visible, .dbtn:focus-visible { outline: 2px solid var(--oro); outline-offset: 2px; }
+
+/* ── dialogue ────────────────────────────────────────── */
+.talk {
+  position: absolute; inset: 0; z-index: 5; background: rgba(8,6,5,.66);
+  display: none; flex-direction: column; justify-content: flex-end;
+}
+.talk.on { display: flex; }
+.panel {
+  background: var(--basalt); border-top: 1px solid var(--linea);
+  border-radius: 20px 20px 0 0; padding: 16px 16px 20px;
+  max-height: 100%; overflow-y: auto; animation: rise .22s ease-out;
+}
+@keyframes rise { from { transform: translateY(26px); opacity: 0; } }
+
+.who { font-size: 10px; color: var(--txt3); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 6px; }
+.says-es { font-family: var(--serif); font-size: 19px; line-height: 1.4; color: var(--txt); }
+
+.objective { font-size: 12.5px; color: var(--oro); margin: 13px 0 0; }
+
+.help { border-radius: 13px; padding: 11px 13px; margin: 10px 0 12px; border: 1px dashed var(--oro-d); background: rgba(232,163,61,.06); }
+.help .lab { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--oro); margin-bottom: 6px; }
+.help .give { font-family: var(--serif); font-size: 18px; color: var(--papel); line-height: 1.35; }
+.help .en { font-size: 12px; color: var(--txt2); margin-top: 4px; }
+.help.hint { border-color: var(--linea); background: rgba(255,255,255,.02); }
+.help.hint .lab { color: var(--txt3); }
+.help.hint .give { color: var(--txt2); letter-spacing: .12em; }
+.help.cold { border: 0; background: none; padding: 0; margin: 12px 0 10px; }
+.help.cold .lab { color: var(--jade); margin: 0; }
+
+.answer { display: flex; gap: 8px; }
+.answer input {
+  flex: 1; min-width: 0; background: var(--ceniza2); border: 1px solid var(--linea);
+  border-radius: 12px; padding: 12px 13px; color: var(--papel); font-family: var(--serif); font-size: 17px;
+}
+.answer input::placeholder { font-family: var(--sans); font-size: 13.5px; color: var(--txt3); }
+.answer input:focus { outline: none; border-color: var(--oro); }
+.go { flex: none; border: 0; border-radius: 12px; padding: 0 17px; cursor: pointer; font: inherit; font-weight: 700; font-size: 13.5px;
+  background: linear-gradient(96deg, var(--oro), #D08A22); color: #221605; }
+.go.jade { background: linear-gradient(96deg, var(--jade), #279B82); color: #06251E; width: 100%; padding: 13px; margin-top: 12px; }
+.go:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
+
+.fb { border-radius: 12px; padding: 10px 13px; margin-top: 11px; font-size: 12.5px; line-height: 1.45; }
+.fb.good { background: rgba(52,179,150,.13); border: 1px solid var(--jade-d); color: #9FE3CE; }
+.fb.bad { background: rgba(217,97,63,.12); border: 1px solid var(--barro-d); color: #F0AE95; }
+.fb b { display: block; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 3px; }
+
+.opts { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+.opt { text-align: left; background: var(--ceniza); border: 1px solid var(--linea); border-radius: 12px; padding: 10px 13px; color: inherit; font: inherit; cursor: pointer; }
+.opt .s { font-family: var(--serif); font-size: 16px; display: block; line-height: 1.3; }
+.opt .e { font-size: 11.5px; color: var(--txt2); display: block; margin-top: 2px; }
+.opt:focus-visible { outline: 2px solid var(--oro); outline-offset: 2px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { padding: 4px 10px; border-radius: 8px; font-family: var(--serif); font-size: 14.5px;
+  border: 1px solid var(--oro-d); color: var(--oro); background: rgba(232,163,61,.07); }
+.chip.jade { border-color: var(--jade-d); color: var(--jade); background: rgba(52,179,150,.07); }
+
+.legend { width: 100%; max-width: 392px; display: flex; flex-direction: column; gap: 9px; font-size: 13px; line-height: 1.5; color: var(--txt2); }
+.legend h2 { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--txt3); margin: 0; font-weight: 600; }
+.legend div { display: flex; gap: 9px; }
+.legend b { color: var(--oro); font-weight: 600; flex: none; }
+.legend .j { color: var(--jade); }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<header class="masthead">
+  <h1>Granada</h1>
+  <p>Walk the city. Arrows or WASD on a keyboard, the pad on a phone.
+     Find someone with a gold <b style="color:#E8A33D">!</b> over their head and press A.</p>
+</header>
+
+<div class="phone" id="phone">
+  <div class="hud">
+    <div class="quest">
+      <div class="lab" id="qLab">Quest</div>
+      <div class="goal" id="qGoal">Find the hostel on Calle La Libertad</div>
+    </div>
+    <div class="wc"><b id="wCount">0</b>words</div>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv"></canvas>
+    <div class="prompt" id="prompt"></div>
+
+    <div class="talk" id="talk">
+      <div class="panel" id="panel"></div>
+    </div>
+  </div>
+
+  <div class="pad">
+    <div class="dpad">
+      <button class="dbtn u" data-dir="up" type="button" aria-label="Walk north">▲</button>
+      <button class="dbtn l" data-dir="left" type="button" aria-label="Walk west">◀</button>
+      <div class="dmid"></div>
+      <button class="dbtn r" data-dir="right" type="button" aria-label="Walk east">▶</button>
+      <button class="dbtn d" data-dir="down" type="button" aria-label="Walk south">▼</button>
+    </div>
+    <button class="abtn" id="abtn" type="button">A</button>
+  </div>
+</div>
+
+<section class="legend">
+  <h2>What to watch for</h2>
+  <div><b>1</b><span>The hostel gives you every line to copy. By the taxi,
+    <em>por favor</em> is gone from the screen — you type it or you don't.</span></div>
+  <div><b>2</b><span>Miss twice and options appear. Never stuck, and nothing is
+    locked behind homework.</span></div>
+  <div><b class="j">3</b><span>Words you use go into the same vocabulary the app
+    already tracks. Gold is growing, jade is locked in.</span></div>
+</section>
+
+<script>
+(() => {
+'use strict';
+
+// ══ WORLD ════════════════════════════════════════════════
+const TS = 16, W = 56, H = 40;
+// tiles
+const COBBLE=0, GRASS=1, TREE=2, WATER=3, SHORE=4, ROOF=5, WALL=6, DOOR=7,
+      PLAZA=8, FOUNT=9, AWNING=10, TABLE=11, KERB=12, TOWER=13, SAND=14,
+      PATIO=15, PALM=16;
+const SOLID = new Set([TREE, WATER, ROOF, WALL, FOUNT, AWNING, TABLE, TOWER, PATIO, PALM]);
+
+const grid = new Uint8Array(W * H);
+const tint = new Uint8Array(W * H);          // which facade colour
+const at = (x, y) => grid[y * W + x];
+const put = (x, y, t, c) => { if (x>=0&&y>=0&&x<W&&y<H) { grid[y*W+x] = t; if (c!==undefined) tint[y*W+x] = c; } };
+const rect = (x0, y0, x1, y1, t, c) => { for (let y=y0;y<=y1;y++) for (let x=x0;x<=x1;x++) put(x,y,t,c); };
+
+// Granada's painted facades. Ochre, teal, rose, indigo, cream — the real thing.
+const FACES = ['#D89A4E','#3E8E8A','#C4685F','#5B6BA8','#E3CFA3','#B98F5A','#7FA05C'];
+const ROOFS = ['#A8503A','#96462F','#B25C40','#8E4030'];
+
+let seed = 20260821;
+const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+
+// streets everywhere, then blocks of buildings between them
+grid.fill(COBBLE);
+const COLS = [[2,8],[11,17],[20,26],[29,35],[38,44]];
+const ROWS = [[2,7],[10,15],[18,23],[26,31],[34,38]];
+
+for (const [x0,x1] of COLS) for (const [y0,y1] of ROWS) {
+  // subdivide the block into 2–3 houses so no two facades match
+  let x = x0;
+  while (x <= x1) {
+    const w = Math.min(2 + Math.floor(rnd()*2), x1 - x + 1);
+    const c = Math.floor(rnd()*FACES.length);
+    rect(x, y0, x+w-1, y1-1, ROOF, c);
+    rect(x, y1, x+w-1, y1, WALL, c);            // facade faces you, ALTTP-style
+    if (w >= 2) put(x + (w>2?1:0), y1, DOOR, c);
+    // The patio. Every colonial house here is built around one, and they are
+    // what stops a block reading as one solid slab of roof.
+    if (w >= 3 && y1 - y0 >= 4) {
+      rect(x+1, y0+1, x+w-2, y1-3, PATIO, c);
+      put(x+1+Math.floor((w-2)/2), y0+2, PALM, c);
+    }
+    x += w;
+  }
+}
+// kerbs
+for (const [x0,x1] of COLS) for (const [y0,y1] of ROWS) {
+  for (let x=x0-1;x<=x1+1;x++) { if (at(x,y1+1)===COBBLE) put(x,y1+1,KERB); if (at(x,y0-1)===COBBLE) put(x,y0-1,KERB); }
+}
+
+// ── the lake ─────────────────────────────────────────────
+rect(49, 0, W-1, H-1, WATER);
+rect(47, 0, 48, H-1, SAND);
+
+// ── Parque Central ───────────────────────────────────────
+rect(11, 18, 17, 23, GRASS);
+rect(13, 20, 15, 21, PLAZA);
+put(14, 20, FOUNT); put(14, 21, FOUNT);
+[[11,18],[17,18],[11,23],[17,23],[12,21],[16,19],[11,20],[17,22]].forEach(([x,y]) => put(x,y,TREE));
+
+// ── the cathedral, facing the park ───────────────────────
+rect(20, 18, 26, 22, ROOF, 4);
+rect(20, 23, 26, 23, WALL, 4);
+put(23, 23, DOOR, 4);
+put(20, 17, TOWER); put(21, 17, TOWER); put(25, 17, TOWER); put(26, 17, TOWER);
+rect(20, 24, 26, 24, PLAZA);
+
+// ── Calle La Calzada: cathedral straight down to the water ─
+rect(27, 16, 48, 17, COBBLE);
+rect(27, 15, 48, 15, KERB);
+rect(27, 18, 48, 18, KERB);
+[30,34,38,42].forEach((x) => { put(x,15,TABLE); put(x+1,18,TABLE); });
+
+// ── Mercado ──────────────────────────────────────────────
+rect(2, 26, 8, 31, AWNING);
+rect(2, 32, 8, 32, COBBLE);
+for (let x=2;x<=8;x+=2) put(x, 31, DOOR);
+
+// ── the hostel, on Calle La Libertad ─────────────────────
+rect(11, 26, 17, 30, ROOF, 1);
+rect(11, 31, 17, 31, WALL, 1);
+put(14, 31, DOOR, 1);
+
+// ══ PEOPLE ═══════════════════════════════════════════════
+// Nicaraguan Spanish: voseo, cuarto not habitación, córdobas, chele prices.
+const NPCS = [
+  { id:'hostal', x:14, y:33, skin:'#B9825A', shirt:'#4C7FB5', name:'El muchacho del hostal',
+    quest:'Get yourself a room', where:'Find the hostel on Calle La Libertad',
+    done:'You have a room. The lad at the desk already knows your name.',
+    idle:'Ahí está su llave, pues.',
+    beats:[
+      { es:'Buenas. ¿En qué le ayudo?', objective:'Ask for a room', key:'buenas',
+        say:'Buenas. Quiero un cuarto.', en:'Hello. I want a room.',
+        ok:['buenas quiero un cuarto','quiero un cuarto','quiero un cuarto por favor',
+            'buenas quiero un cuarto por favor','quiero una habitacion','buenas quiero una habitacion'],
+        teaches:['buenas','querer','cuarto'],
+        good:'Cuarto, not habitación. Habitación is what a Spaniard says.',
+        decoys:[{es:'¿Dónde está el baño?',en:'Where is the bathroom?'},
+                {es:'Soy de Estados Unidos.',en:'I am from the United States.'}] },
+      { es:'¿Para cuántas noches?', objective:'Three nights', key:'tres noches',
+        say:'Tres noches.', en:'Three nights.',
+        ok:['tres noches','tres','por tres noches','para tres noches','son tres noches'],
+        teaches:['tres','noche'],
+        good:'Short is normal. Nobody builds a sentence for this.',
+        decoys:[{es:'Tres córdobas.',en:'Three córdobas.'},{es:'A las tres.',en:'At three o’clock.'}] },
+      { es:'Son quince dólares la noche. ¿Está bien?', objective:'Agree', key:'esta bien',
+        say:'Está bien.', en:'That’s fine.',
+        ok:['esta bien','si esta bien','si','esta bien gracias','si esta bien gracias','muy bien'],
+        teaches:['estar','bien','quince'],
+        good:'Está bien is the whole language for yes, agreed, fine, alright.',
+        decoys:[{es:'Está bueno.',en:'It tastes good.'},{es:'No hay.',en:'There is none.'}] }
+    ] },
+  { id:'calzada', x:33, y:17, skin:'#8E5B3C', shirt:'#C4685F', name:'La muchacha del comedor',
+    quest:'Order breakfast and pay', where:'Walk east down Calle La Calzada',
+    done:'Gallo pinto, café, and you asked for the bill without pointing at anything.',
+    idle:'Vuelva mañana, pues.',
+    beats:[
+      { es:'Buenas, ¿qué le doy?', objective:'Order gallo pinto', key:'por favor',
+        say:'Buenas. Un gallo pinto, por favor.', en:'Hello. A gallo pinto, please.',
+        ok:['buenas un gallo pinto por favor','un gallo pinto por favor','gallo pinto por favor',
+            'un gallo pinto','gallo pinto','quiero un gallo pinto','buenas un gallo pinto'],
+        teaches:['gallo pinto','por favor'],
+        good:'Rice and beans fried together. Breakfast, and there is no other option.',
+        decoys:[{es:'Un gallo, por favor.',en:'A rooster, please.'},{es:'Quiero comer.',en:'I want to eat.'}] },
+      { es:'¿Y de tomar?', objective:'A coffee', key:'por favor',
+        say:'Un café, por favor.', en:'A coffee, please.',
+        ok:['un cafe por favor','cafe por favor','un cafe','cafe','un cafe negro por favor','cafe negro'],
+        teaches:['café','tomar'],
+        good:'De tomar covers anything you drink, not just alcohol.',
+        decoys:[{es:'Nada, gracias.',en:'Nothing, thanks.'},{es:'Agua, por favor.',en:'Water, please.'}] },
+      { es:'Ahí le va, pues.', objective:'Ask what you owe', key:'cuanto le debo',
+        say:'¿Cuánto le debo?', en:'How much do I owe you?',
+        ok:['cuanto le debo','cuanto es','la cuenta por favor','cuanto vale','cuanto cuesta','cuanto le debo por favor'],
+        teaches:['cuánto','deber'],
+        good:'¿Cuánto le debo? is warmer than la cuenta. It assumes you are staying.',
+        decoys:[{es:'¿Cuánto tiempo?',en:'How long?'},{es:'Está muy rico.',en:'It is delicious.'}] }
+    ] },
+  { id:'taxi', x:19, y:21, skin:'#7A5238', shirt:'#E3CFA3', name:'El taxista',
+    quest:'Get to the market without paying the chele price', where:'A taxi waits by Parque Central',
+    done:'Eighty-five, and a lecture about Mombacho the whole way there.',
+    idle:'Cuando quiera, jefe.',
+    beats:[
+      { es:'¿Para dónde vamos?', objective:'The market', key:'por favor',
+        say:'Al mercado, por favor.', en:'To the market, please.',
+        ok:['al mercado por favor','al mercado','mercado','al mercado municipal','quiero ir al mercado','voy al mercado'],
+        teaches:['mercado','ir'],
+        good:'Al mercado. Nobody in Granada uses a street name for anything.',
+        decoys:[{es:'Al parque, por favor.',en:'To the park, please.'},{es:'No sé.',en:'I don’t know.'}] },
+      { es:'Cien córdobas.', objective:'That is the chele price — offer eighty', key:'ochenta',
+        say:'¿Ochenta?', en:'Eighty?',
+        ok:['ochenta','ochenta cordobas','le doy ochenta','ochenta y ya','que sean ochenta','ochenta va'],
+        teaches:['ochenta','córdoba'],
+        good:'One word, said like a question. Haggling here is not an argument.',
+        decoys:[{es:'Es muy caro.',en:'That is very expensive.'},{es:'Está bien.',en:'Fine.'}] },
+      { es:'Ochenta y cinco y nos vamos.', objective:'Take it', key:'esta bien',
+        say:'Está bien.', en:'Alright.',
+        ok:['esta bien','si esta bien','esta bien vamos','vamos','si vamos','dale','si'],
+        teaches:['bien'],
+        good:'You met him in the middle. That is the entire ritual.',
+        decoys:[{es:'Ochenta.',en:'Eighty.'},{es:'No, gracias.',en:'No, thank you.'}] }
+    ] }
+];
+
+const MOMO_GOOD = ['¡Eso!','¡Ideay!','¡Ya!','¡Aha!'];
+const MOMO_BAD  = ['Mmm…','Casi.','Oje…','Otra vez.'];
+
+// ══ STATE ════════════════════════════════════════════════
+const S = {
+  px: 19 * TS + 8, py: 25 * TS + 8, dir: 0, step: 0, moving: false,
+  seen: {}, words: {}, finished: {},
+  npc: null, beat: 0, misses: 0, talking: false
+};
+const $ = (id) => document.getElementById(id);
+
+// ══ PRERENDER THE CITY ═══════════════════════════════════
+const world = document.createElement('canvas');
+world.width = W * TS; world.height = H * TS;
+(() => {
+  const g = world.getContext('2d');
+  const n = (x, y, s) => ((Math.sin(x*12.9898 + y*78.233) * 43758.5453) % 1 + 1) % 1 * s;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const t = at(x, y), X = x*TS, Y = y*TS, c = FACES[tint[y*W+x]];
+    switch (t) {
+      case WATER:
+        g.fillStyle = '#2B6C86'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = '#3E8AA6'; g.fillRect(X, Y + ((x+y)%3)*5, TS, 2); break;
+      case SAND: case SHORE:
+        g.fillStyle = '#C2A97C'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = '#B39C71'; g.fillRect(X+((x*5)%12), Y+((y*7)%12), 3, 2); break;
+      case GRASS:
+        g.fillStyle = '#5F8A4A'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = '#6D9954'; g.fillRect(X+2+n(x,y,8), Y+3+n(y,x,8), 3, 2); break;
+      case TREE:
+        g.fillStyle = '#5F8A4A'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = '#6B4A2E'; g.fillRect(X+7,Y+9,3,6);
+        g.fillStyle = '#3E6B33'; g.beginPath(); g.arc(X+8,Y+7,6.5,0,7); g.fill();
+        g.fillStyle = '#4C7F3E'; g.beginPath(); g.arc(X+6,Y+5,4,0,7); g.fill(); break;
+      case PLAZA:
+        g.fillStyle = '#C9B896'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = '#BCAA88'; g.fillRect(X,Y,TS,1); g.fillRect(X,Y,1,TS); break;
+      case FOUNT:
+        g.fillStyle = '#C9B896'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = '#9E8D6E'; g.fillRect(X+1,Y+1,14,14);
+        g.fillStyle = '#3E8AA6'; g.fillRect(X+3,Y+3,10,10); break;
+      case KERB:
+        g.fillStyle = '#8A7A63'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = '#9C8B72'; g.fillRect(X,Y+1,TS,2); break;
+      case ROOF:
+        g.fillStyle = ROOFS[(x*3+y*5) % ROOFS.length]; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = 'rgba(0,0,0,.13)';
+        for (let i=0;i<TS;i+=4) g.fillRect(X, Y+i, TS, 1);
+        g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(X,Y,TS,1);
+        // a seam where one house ends and the next begins
+        if (at(x-1,y) !== ROOF || tint[y*W+x-1] !== tint[y*W+x]) {
+          g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(X,Y,1,TS);
+        }
+        if (at(x,y-1) !== ROOF && at(x,y-1) !== PATIO && at(x,y-1) !== PALM) {
+          g.fillStyle = 'rgba(255,255,255,.13)'; g.fillRect(X,Y,TS,2);
+        }
+        break;
+      case PATIO:
+        g.fillStyle = '#C9B896'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = '#BCAA88'; g.fillRect(X,Y,TS,1); g.fillRect(X,Y,1,TS);
+        g.fillStyle = 'rgba(0,0,0,.20)';
+        if (at(x,y-1) === ROOF) g.fillRect(X,Y,TS,3);
+        if (at(x-1,y) === ROOF) g.fillRect(X,Y,3,TS);
+        if (at(x+1,y) === ROOF) g.fillRect(X+TS-3,Y,3,TS);
+        break;
+      case PALM:
+        g.fillStyle = '#C9B896'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = '#6B4A2E'; g.fillRect(X+7,Y+8,2,7);
+        g.fillStyle = '#3E6B33'; g.beginPath(); g.arc(X+8,Y+6,5,0,7); g.fill();
+        g.fillStyle = '#C4548F'; g.fillRect(X+4,Y+3,2,2); g.fillRect(X+11,Y+7,2,2); break;
+      case TOWER:
+        g.fillStyle = '#E3CFA3'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = '#A8503A'; g.fillRect(X+2,Y,12,4);
+        g.fillStyle = '#8A7A63'; g.fillRect(X+5,Y+7,6,9); break;
+      case WALL:
+        g.fillStyle = c; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(X,Y,TS,3);
+        g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(X+3,Y+6,4,6); g.fillRect(X+9,Y+6,4,6);
+        g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(X,Y+TS-2,TS,2); break;
+      case DOOR:
+        g.fillStyle = c; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(X,Y,TS,3);
+        g.fillStyle = '#5A3A24'; g.fillRect(X+4,Y+4,8,12);
+        g.fillStyle = '#C9A24B'; g.fillRect(X+10,Y+10,2,2); break;
+      case AWNING:
+        g.fillStyle = '#8A7A63'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = (x+y)%2 ? '#C4685F' : '#E3CFA3'; g.fillRect(X,Y+2,TS,11);
+        g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(X,Y+13,TS,3); break;
+      case TABLE:
+        g.fillStyle = '#8A7A63'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = '#3E8E8A'; g.beginPath(); g.arc(X+8,Y+8,5.5,0,7); g.fill();
+        g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(X+7,Y+12,2,4); break;
+      default:
+        g.fillStyle = '#8A7A63'; g.fillRect(X,Y,TS,TS);
+        g.fillStyle = 'rgba(0,0,0,.09)';
+        g.fillRect(X + ((y%2)*8), Y+4, 7, 3); g.fillRect(X + ((y%2)*8) + 4, Y+11, 7, 3);
+    }
+  }
+})();
+
+// ══ CANVAS ═══════════════════════════════════════════════
+const cv = $('cv'), ctx = cv.getContext('2d');
+let SCALE = 1.75, VW = 0, VH = 0;
+function resize() {
+  const r = cv.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  VW = r.width; VH = r.height;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+}
+new ResizeObserver(resize).observe(cv);
+
+function person(g, x, y, skin, shirt, dir, walk) {
+  const sway = walk ? (Math.floor(walk / 8) % 2 ? 1 : -1) : 0;
+  g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(x, y + 7, 6, 2.6, 0, 0, 7); g.fill();
+  g.fillStyle = '#2E2A38'; g.fillRect(x - 4, y + 1, 3, 6 + (sway > 0 ? -1 : 0));
+  g.fillRect(x + 1, y + 1, 3, 6 + (sway < 0 ? -1 : 0));
+  g.fillStyle = shirt; g.fillRect(x - 5, y - 6, 10, 8);
+  g.fillStyle = skin; g.fillRect(x - 5, y - 5, 2, 5); g.fillRect(x + 3, y - 5, 2, 5);
+  g.fillRect(x - 4, y - 13, 8, 8);
+  g.fillStyle = '#2A1D14'; g.fillRect(x - 5, y - 14, 10, 4);
+  if (dir === 0) { g.fillStyle = '#1A1512'; g.fillRect(x - 3, y - 10, 2, 2); g.fillRect(x + 1, y - 10, 2, 2); }
+  else if (dir === 2) { g.fillStyle = '#1A1512'; g.fillRect(x - 3, y - 10, 2, 2); }
+  else if (dir === 3) { g.fillStyle = '#1A1512'; g.fillRect(x + 1, y - 10, 2, 2); }
+}
+
+let t0 = 0;
+function frame(t) {
+  const dt = Math.min(34, t - t0); t0 = t;
+  if (!S.talking) move(dt);
+
+  const cx = Math.max(VW/2/SCALE, Math.min(W*TS - VW/2/SCALE, S.px));
+  const cy = Math.max(VH/2/SCALE, Math.min(H*TS - VH/2/SCALE, S.py));
+  const ox = Math.round(cx - VW/2/SCALE), oy = Math.round(cy - VH/2/SCALE);
+
+  ctx.fillStyle = '#6E5B45'; ctx.fillRect(0, 0, VW, VH);
+  ctx.save(); ctx.scale(SCALE, SCALE); ctx.translate(-ox, -oy);
+  ctx.drawImage(world, 0, 0);
+
+  for (const n of NPCS) {
+    person(ctx, n.x*TS + 8, n.y*TS + 8, n.skin, n.shirt, 0, 0);
+    const done = S.finished[n.id];
+    const bob = Math.sin(t/260) * 1.6;
+    const mx = n.x*TS + 8, my = n.y*TS - 15 + bob;
+    ctx.fillStyle = done ? '#1C5F50' : '#E8A33D';
+    ctx.beginPath(); ctx.roundRect(mx-7, my-6, 14, 12, 3); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(mx-3, my+5); ctx.lineTo(mx+2, my+5); ctx.lineTo(mx, my+9); ctx.fill();
+    ctx.fillStyle = done ? '#34B396' : '#2B1A06';
+    if (done) { ctx.fillRect(mx-4, my-1, 3, 4); ctx.fillRect(mx-3, my+1, 7, 2); }
+    else { ctx.fillRect(mx-1, my-4, 2, 6); ctx.fillRect(mx-1, my+3, 2, 2); }
+  }
+  person(ctx, S.px, S.py, '#D8A87C', '#34B396', S.dir, S.moving ? S.step : 0);
+  ctx.restore();
+
+  const near = nearest();
+  const p = $('prompt'), a = $('abtn');
+  if (near && !S.talking) {
+    p.innerHTML = `<b>A</b> — ${S.finished[near.id] ? 'talk to' : 'talk to'} ${near.name}`;
+    p.classList.add('on'); a.classList.add('live');
+  } else { p.classList.remove('on'); a.classList.remove('live'); }
+
+  requestAnimationFrame(frame);
+}
+
+// ══ MOVEMENT ═════════════════════════════════════════════
+const held = {}, minHold = {};
+const IMPULSE = 130;   // ms of travel a single tap is worth
+function press(dir) { held[dir] = true; minHold[dir] = performance.now() + IMPULSE; }
+function release(dir) { held[dir] = false; }
+function isHeld(dir) { return held[dir] || (minHold[dir] || 0) > performance.now(); }
+function blocked(x, y) {
+  const t = at(Math.floor(x/TS), Math.floor(y/TS));
+  return t === undefined || SOLID.has(t);
+}
+function canGo(x, y) {
+  return !blocked(x - 4, y + 4) && !blocked(x + 4, y + 4) && !blocked(x - 4, y - 2) && !blocked(x + 4, y - 2);
+}
+function move(dt) {
+  const sp = dt * 0.062;
+  let dx = 0, dy = 0;
+  if (isHeld('left')) { dx -= sp; S.dir = 2; }
+  if (isHeld('right')) { dx += sp; S.dir = 3; }
+  if (isHeld('up')) { dy -= sp; S.dir = 1; }
+  if (isHeld('down')) { dy += sp; S.dir = 0; }
+  S.moving = !!(dx || dy);
+  if (!S.moving) { S.step = 0; return; }
+  S.step += dt * 0.35;
+  if (canGo(S.px + dx, S.py)) S.px += dx;
+  if (canGo(S.px, S.py + dy)) S.py += dy;
+  S.px = Math.max(6, Math.min(W*TS - 6, S.px));
+  S.py = Math.max(10, Math.min(H*TS - 4, S.py));
+}
+function nearest() {
+  for (const n of NPCS) {
+    const d = Math.hypot(n.x*TS + 8 - S.px, n.y*TS + 8 - S.py);
+    if (d < 26) return n;
+  }
+  return null;
+}
+
+const KEYS = { ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right',
+               w:'up', s:'down', a:'left', d:'right', W:'up', S:'down', A:'left', D:'right' };
+addEventListener('keydown', (e) => {
+  if (S.talking) return;
+  const k = KEYS[e.key];
+  if (k) { press(k); e.preventDefault(); }
+  if (e.key === 'e' || e.key === 'E' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tryTalk(); }
+});
+addEventListener('keyup', (e) => { const k = KEYS[e.key]; if (k) release(k); });
+
+for (const b of document.querySelectorAll('.dbtn')) {
+  const dir = b.dataset.dir;
+  const on = (e) => { e.preventDefault(); press(dir); b.classList.add('held'); };
+  const off = () => { release(dir); b.classList.remove('held'); };
+  b.addEventListener('pointerdown', on);
+  b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off);
+  b.addEventListener('pointercancel', off);
+}
+$('abtn').addEventListener('click', tryTalk);
+
+// ══ TALK ═════════════════════════════════════════════════
+const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[¿?¡!.,;:"'()]/g, ' ').replace(/\s+/g, ' ').trim();
+
+function accepted(typed, beat) {
+  const t = norm(typed);
+  if (!t) return false;
+  if (beat.ok.some((a) => norm(a) === t)) return true;
+  return beat.ok.some((a) => {
+    const want = norm(a).split(' ').filter((w) => w.length > 2);
+    if (!want.length) return false;
+    let i = 0;
+    for (const w of t.split(' ')) if (w === want[i]) i++;
+    return i === want.length;
+  });
+}
+// No speech. The only voice available is es-MX and it reads Nicaraguan
+// Spanish in a Mexican accent, which teaches the wrong thing. This game is
+// read-only by decision.
+const momoSvg = (uid) => `<svg id="momo-${uid}" width="46" height="54" viewBox="0 0 64 74" aria-hidden="true" style="flex:none">
+  <g><rect x="30.6" y="44" width="2.8" height="16" fill="#2F9C86"/><ellipse cx="32" cy="63" rx="4.6" ry="6" fill="#2F9C86"/></g>
+  <ellipse cx="32" cy="44" rx="13" ry="15" fill="#2F9C86"/>
+  <ellipse cx="32" cy="47" rx="8" ry="10" fill="#C77A4E"/>
+  <circle cx="32" cy="26" r="12" fill="#2F9C86"/>
+  <path d="M20 24 q12 -12 24 0 q-12 -6 -24 0 Z" fill="#3FB79E"/>
+  <path d="M22.5 22.5 q3.5 -3 7 0" stroke="#5FE0C8" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M34.5 22.5 q3.5 -3 7 0" stroke="#5FE0C8" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <ellipse cx="26" cy="27" rx="3.2" ry="3.4" fill="#14100E"/><ellipse cx="38" cy="27" rx="3.2" ry="3.4" fill="#14100E"/>
+  <circle cx="27" cy="26" r="1" fill="#F4E9D6"/><circle cx="39" cy="26" r="1" fill="#F4E9D6"/>
+  <path d="M28.5 31 L35.5 31 L32 38 Z" fill="#14100E"/></svg>`;
+
+function tryTalk() {
+  if (S.talking) return;
+  const n = nearest();
+  if (!n) return;
+  S.npc = n; S.beat = 0; S.misses = 0; S.talking = true;
+  for (const k in held) { held[k] = false; minHold[k] = 0; }
+  $('talk').classList.add('on');
+  if (S.finished[n.id]) idleLine(n); else renderBeat();
+}
+function closeTalk() {
+  S.talking = false; $('talk').classList.remove('on');
+  refreshQuest();
+}
+function idleLine(n) {
+  $('panel').innerHTML =
+    `<div class="who">${n.name}</div><div class="says-es">${n.idle}</div>
+     <button class="go jade" id="bye" type="button">Leave</button>`;
+  $('bye').addEventListener('click', closeTalk);
+}
+const hintOf = (s) => s.replace(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/g, (w) => w[0] + '·'.repeat(Math.max(1, w.length - 1)));
+
+function renderBeat() {
+  const n = S.npc, beat = n.beats[S.beat], lvl = S.seen[beat.key] || 0;
+  let help;
+  if (lvl === 0) help = `<div class="help"><div class="lab">New — say this</div>
+      <div class="give es">${beat.say}</div><div class="en">${beat.en}</div></div>`;
+  else if (lvl === 1) help = `<div class="help hint"><div class="lab">You have had this once</div>
+      <div class="give es">${hintOf(beat.say)}</div><div class="en">${beat.en}</div></div>`;
+  else help = `<div class="help cold"><div class="lab">On your own</div></div>`;
+
+  $('panel').innerHTML =
+    `<div style="display:flex;gap:10px;align-items:flex-start">
+       ${momoSvg('b' + S.beat)}
+       <div style="flex:1;min-width:0">
+         <div class="who">${n.name}</div>
+         <div class="says-es">${beat.es}</div>
+         <div class="objective">${beat.objective}</div>
+       </div>
+     </div>` +
+    help +
+    `<div class="answer">
+       <input id="typed" type="text" autocomplete="off" autocorrect="off" spellcheck="false"
+              placeholder="Type your answer in Spanish…" aria-label="Your answer in Spanish">
+       <button class="go" id="send" type="button">Say it</button>
+     </div><div id="after"></div>`;
+  $('send').addEventListener('click', submit);
+  const inp = $('typed');
+  inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') submit(); });
+  setTimeout(() => inp.focus(), 50);
+}
+function submit() {
+  const beat = S.npc.beats[S.beat], inp = $('typed');
+  if (!inp.value.trim()) return;
+  if (accepted(inp.value, beat)) return land(beat);
+  S.misses++;
+  const after = $('after');
+  if (S.misses < 2) {
+    after.innerHTML = `<div class="fb bad"><b>${MOMO_BAD[0]} not quite</b>Try again — or say less. Short answers are normal here.</div>`;
+    inp.select(); return;
+  }
+  const opts = [{ ...beat, right: true, es: beat.say, en: beat.en }, ...beat.decoys].sort(() => Math.random() - 0.5);
+  after.innerHTML = `<div class="fb bad"><b>Here are three</b>Tap the one that fits.</div>
+    <div class="opts">${opts.map((o) =>
+      `<button class="opt" type="button" data-right="${!!o.right}">
+        <span class="s es">${o.es}</span><span class="e">${o.en}</span></button>`).join('')}</div>`;
+  after.querySelectorAll('.opt').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.right === 'true') land(beat);
+    else b.style.borderColor = 'var(--barro-d)';
+  }));
+}
+function land(beat) {
+  S.seen[beat.key] = (S.seen[beat.key] || 0) + 1;
+  beat.teaches.forEach((w) => { S.words[w] = (S.words[w] || 0) + 1; });
+  $('wCount').textContent = Object.keys(S.words).length;
+  $('typed').disabled = true; $('send').disabled = true;
+  $('after').innerHTML =
+    `<div class="fb good"><b>${MOMO_GOOD[Math.floor(Math.random()*MOMO_GOOD.length)]} that works</b>${beat.good}</div>
+     <div class="chips">${beat.teaches.map((w) =>
+       `<span class="chip${S.words[w] > 1 ? ' jade' : ''}">${w}</span>`).join('')}</div>
+     <button class="go jade" id="next" type="button">Next</button>`;
+  $('next').addEventListener('click', () => {
+    S.beat++; S.misses = 0;
+    if (S.beat >= S.npc.beats.length) finish(); else renderBeat();
+  });
+  $('next').focus();
+}
+function finish() {
+  const n = S.npc;
+  S.finished[n.id] = true;
+  const learned = Object.keys(S.words);
+  $('panel').innerHTML =
+    `<div style="text-align:center">
+       ${momoSvg('end')}
+       <div class="es" style="font-size:24px;color:var(--jade);margin:6px 0 6px">¡Listo!</div>
+       <p style="color:var(--txt2);font-size:13px;line-height:1.5;margin:0 auto;max-width:28ch">${n.done}</p>
+       <div class="chips" style="justify-content:center;margin-top:14px">${learned.map((w) =>
+         `<span class="chip${S.words[w] > 1 ? ' jade' : ''}">${w}</span>`).join('')}</div>
+       <button class="go jade" id="bye" type="button">Back to Granada</button>
+     </div>`;
+  $('bye').addEventListener('click', closeTalk);
+  $('bye').focus();
+}
+function refreshQuest() {
+  const open = NPCS.find((n) => !S.finished[n.id]);
+  if (!open) { $('qLab').textContent = 'Day one'; $('qGoal').textContent = 'Granada is yours. Go and find someone to talk to.'; return; }
+  $('qLab').textContent = 'Quest';
+  $('qGoal').textContent = open.where + ' — ' + open.quest.toLowerCase();
+}
+
+resize(); refreshQuest(); requestAnimationFrame(frame);
+})();
+</script>
