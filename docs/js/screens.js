@@ -7,7 +7,7 @@ import { $, el, clear, esc, md, showScreen, toast, initials, ago, bytes } from '
 import * as store from './store.js';
 import * as cloud from './cloud.js';
 import * as speech from './speech.js';
-import { content, lessonsByPhase, checkForContentUpdate, cacheSize, packVersion } from './content.js';
+import { content, lessonsByPhase, checkForContentUpdate, cacheSize, packVersion, resolve } from './content.js';
 import { MOMO_MINI, momoSvg, createMomo, daysBetween } from './momo.js';
 import {
   memoryStrength, band, calcFluency, fadingWords, leeches, tokenize, cleanWord,
@@ -292,7 +292,11 @@ export function renderPath() {
 let warm = null;
 
 export function openLesson_(lesson) {
-  const words = (lesson.warmup || []).filter((w) => content.dict[w]);
+  // Keep the entry, not the spelling the lesson happened to use, so the
+  // warm-up and the reader strengthen one memory rather than two.
+  const words = [...new Set((lesson.warmup || [])
+    .map((w) => resolve(cleanWord(w)))
+    .filter(Boolean))];
   if (!words.length) return openReader(lesson);
   warm = { lesson, words, i: 0 };
   $('wuTitle').textContent = lesson.title;
@@ -356,7 +360,7 @@ export function openReader(lesson) {
   const strengthClass = (w) => {
     const v = vocab[w];
     if (!v) return '';
-    const m = memoryStrength(v.exposures || 0, v.lastSeen || 0);
+    const m = memoryStrength(v);
     return m >= 0.8 ? ' s3' : m >= 0.5 ? ' s2' : m >= 0.2 ? ' s1' : '';
   };
 
@@ -364,8 +368,10 @@ export function openReader(lesson) {
     const p = el('p', 'line');
     const s = el('span', 's');
     for (const tok of tokenize(sn.es)) {
-      if (tok.isWord && content.dict[cleanWord(tok.raw)]) {
-        const key = cleanWord(tok.raw);
+      // resolve(), not a bare dictionary hit: "hablas" belongs to hablar and
+      // has to underline, open and count as the same word.
+      const key = tok.isWord ? resolve(cleanWord(tok.raw)) : null;
+      if (key) {
         const w = el('span', 'w' + strengthClass(key), tok.raw);
         w.addEventListener('click', () => openWord(key));
         s.appendChild(w);
@@ -407,8 +413,8 @@ export function openReader(lesson) {
   const seen = new Set();
   for (const sn of lesson.sentences) {
     for (const tok of tokenize(sn.es)) {
-      const key = cleanWord(tok.raw);
-      if (tok.isWord && content.dict[key]) seen.add(key);
+      const key = tok.isWord ? resolve(cleanWord(tok.raw)) : null;
+      if (key) seen.add(key);
     }
   }
   store.recordExposure([...seen]);
@@ -435,7 +441,7 @@ function openWord(key) {
   const d = content.dict[key];
   if (!d) return;
   const v = store.vocab.all()[key];
-  const m = v ? memoryStrength(v.exposures || 0, v.lastSeen || 0) : 0;
+  const m = v ? memoryStrength(v) : 0;
   const b = band(m);
   const colour = b.key === 'strong' ? 'var(--jade)' : b.key === 'growing' ? 'var(--oro)' : b.key === 'fading' ? 'var(--barro)' : 'var(--txt3)';
 
@@ -454,7 +460,10 @@ function openWord(key) {
   $('shSpeak').style.display = canAudio() ? '' : 'none';
   $('shSpeak').onclick = () => { speech.warmUp(); speech.speak(key, speakOpts()); };
 
-  store.recordExposure(key);
+  // Tapping a word is you saying you do not know it — a weakness signal,
+  // never a strengthening one. It used to record an exposure, so the surest
+  // sign of not knowing a word made the app more confident that you did.
+  store.recordLookup(key);
   $('sheet').classList.add('up');
 }
 
@@ -726,38 +735,57 @@ function paintScene() {
   pad.appendChild(said);
 
   if (listenFirst) {
-    const reveal = el('button', 'go ghost');
-    reveal.type = 'button';
-    reveal.textContent = 'Show the English';
-    reveal.addEventListener('click', () => {
-      said.querySelector('.e').classList.remove('hidden');
-      reveal.remove();
-    });
-    pad.appendChild(reveal);
     speech.warmUp();
     speech.speak(step.es, speakOpts());
   }
 
+  // Every reply is offered in Spanish only.
+  //
+  // These used to print the English translation on the button underneath the
+  // Spanish, which meant you never had to read the Spanish at all — you picked
+  // the English answer and the scene taught you nothing. The whole exercise is
+  // working out what is being said to you and what you would say back, and
+  // 477 options across 40 scenes were handing that away for free.
   const opts = el('div', 'opts');
   for (const o of step.options) {
     const b = el('button', 'opt');
     b.type = 'button';
-    b.innerHTML = `<span class="s">${esc(o.es)}</span><span class="e">${esc(o.en)}</span>`;
+    b.innerHTML = `<span class="s">${esc(o.es)}</span><span class="e hidden">${esc(o.en)}</span>`;
     b.addEventListener('click', () => answerScene(b, o, opts, pad));
     opts.appendChild(b);
   }
   pad.appendChild(opts);
+
+  // One escape hatch for the whole step, and it sits below the choices rather
+  // than above them, so reaching for it is a decision rather than the first
+  // thing your eye lands on. Same blur the prompt already used, so revealing
+  // never shifts the layout.
+  const reveal = el('button', 'go ghost');
+  reveal.type = 'button';
+  reveal.textContent = 'Show the English';
+  reveal.className = 'go ghost sc-reveal';
+  reveal.addEventListener('click', () => revealScene(pad));
+  pad.appendChild(reveal);
+}
+
+/** Unblur every translation on the step — on request, or once you have answered. */
+function revealScene(pad) {
+  pad.querySelectorAll('.e.hidden').forEach((n) => n.classList.remove('hidden'));
+  pad.querySelectorAll('.sc-reveal').forEach((n) => n.remove());
 }
 
 function answerScene(btn, option, opts, pad) {
   opts.querySelectorAll('.opt').forEach((o) => { o.disabled = true; });
+  // The guessing is over, so every translation comes back — the feedback
+  // below refers to what the options actually said.
+  revealScene(pad);
   btn.classList.add(option.verdict === 'good' ? 'good' : option.verdict === 'bad' ? 'bad' : 'ok');
 
   const fb = el('div', `fb show ${option.verdict === 'good' ? 'good' : option.verdict === 'bad' ? 'bad' : 'ok'}`);
   fb.innerHTML = `<b>${option.verdict === 'good' ? 'Perfect' : option.verdict === 'bad' ? 'Not that' : 'Understandable'}</b><span>${md(option.feedback)}</span>`;
   pad.appendChild(fb);
 
-  store.recordExposure([...new Set(tokenize(option.es).filter((t) => t.isWord).map((t) => cleanWord(t.raw)).filter((w) => content.dict[w]))]);
+  store.recordExposure([...new Set(tokenize(option.es).filter((t) => t.isWord).map((t) => resolve(cleanWord(t.raw))).filter(Boolean))]);
   activity();
 
   const next = el('button', 'go');
@@ -790,7 +818,7 @@ export function renderWords() {
   const vocab = store.vocab.all();
   const entries = Object.keys(vocab)
     .filter((w) => content.dict[w])
-    .map((w) => ({ w, m: memoryStrength(vocab[w].exposures || 0, vocab[w].lastSeen || 0) }))
+    .map((w) => ({ w, m: memoryStrength(vocab[w]) }))
     .filter((x) => x.m > 0)
     .sort((a, b) => a.m - b.m);
 
@@ -967,7 +995,7 @@ export function renderMap() {
   const grid = el('div', 'map-grid');
   for (const w of all) {
     const v = vocab[w];
-    const m = v ? memoryStrength(v.exposures || 0, v.lastSeen || 0) : 0;
+    const m = v ? memoryStrength(v) : 0;
     const tile = el('i');
     if (m >= 0.8) tile.className = 's3';
     else if (m >= 0.5) tile.className = 's2';

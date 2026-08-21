@@ -4,17 +4,61 @@
 // the same thing before and after the move to the web. Pure logic — no DOM, no
 // storage, no network — so it can be reasoned about and tested on its own.
 
-// ── MEMORY DECAY ────────────────────────────────────────────
-// A word's strength halves every HL hours, but the half-life stretches with
-// the square root of how many times you've met it: the more exposures, the
-// slower it fades. Capped by exposures/5 so one sighting is never "strong".
+// MEMORY
+//
+// A word's strength halves every HL hours, and the half-life stretches with
+// the square root of how much evidence there is that you hold it.
+//
+// The original model counted one thing: exposures. Meeting a word in a story,
+// tapping it because you did NOT know it, and pulling it out of your head cold
+// in a drill all scored +1 and were indistinguishable. Getting it wrong scored
+// nothing at all, so a word missed five times could still read "Locked in".
+// The app was measuring how much text had gone past your eyes.
+//
+// Four events, weighed by what each is actually evidence of:
+//
+//   exposure  +1   you met it in a story or a warm-up. Familiarity.
+//   recall    +3   you produced it from memory. This is the one that builds
+//                  memory rather than merely refreshing it, and it is worth
+//                  about three sightings.
+//   miss      -2   you were asked and could not. Evidence against, and it has
+//                  to cost more than a sighting is worth, or reading drowns it.
+//   lookup    -1   you tapped it for the meaning, which is you telling the app
+//                  you do not know it. Capped, because the word sheet is also
+//                  how you hear a word said aloud, and curiosity must not be
+//                  able to bury a word you genuinely know.
+//
+// And the ceiling: reading alone cannot lock a word in. With no recall behind
+// it, strength tops out just below the "Locked in" band however often you have
+// seen it. That makes the green on the Words screen mean "I have produced
+// this", not "I have seen this go past".
 const HALF_LIFE_HOURS = 24;
+const RECALL_WORTH = 3;
+const MISS_COST = 2;
+const LOOKUP_COST = 1;
+const LOOKUP_PENALTY_CAP = 3;
+const READING_CEILING = 0.79;   // the top of the "Growing" band
 
-export function memoryStrength(exposures, lastSeenMs, nowMs = Date.now()) {
-  if (!exposures) return 0;
-  const hours = (nowMs - lastSeenMs) / 3600000;
-  const halfLife = HALF_LIFE_HOURS * Math.sqrt(exposures);
-  const m = Math.pow(2, -hours / halfLife) * Math.min(1, exposures / 5);
+/**
+ * How much evidence there is that you hold this word.
+ * Takes a vocabulary record: { exposures, lastSeen, hits, misses, lookups }.
+ */
+export function evidence(v = {}) {
+  return Math.max(0,
+    (v.exposures || 0)
+    + RECALL_WORTH * (v.hits || 0)
+    - MISS_COST * (v.misses || 0)
+    - Math.min(v.lookups || 0, LOOKUP_PENALTY_CAP) * LOOKUP_COST);
+}
+
+export function memoryStrength(v = {}, nowMs = Date.now()) {
+  const weight = evidence(v);
+  if (!weight) return 0;
+  const hours = (nowMs - (v.lastSeen || 0)) / 3600000;
+  const halfLife = HALF_LIFE_HOURS * Math.sqrt(weight);
+  let ceiling = Math.min(1, weight / 5);
+  if (!(v.hits > 0)) ceiling = Math.min(ceiling, READING_CEILING);
+  const m = Math.pow(2, -hours / halfLife) * ceiling;
   return Math.min(1, Math.max(0, m));
 }
 
@@ -114,7 +158,7 @@ export function calcFluency(vocab, progress, unlockedPatterns, totals) {
   let strong = 0;
   for (const key of Object.keys(vocab)) {
     const v = vocab[key];
-    const m = memoryStrength(v.exposures || 0, v.lastSeen || 0, now);
+    const m = memoryStrength(v, now);
     if (m >= 0.2) known++;
     if (m >= 0.8) strong++;
   }
@@ -182,7 +226,7 @@ export function fadingWords(vocab, dict, limit = 30) {
   const now = Date.now();
   return Object.keys(vocab)
     .filter((w) => dict[w] && (vocab[w].exposures || 0) >= 1)
-    .map((w) => ({ word: w, m: memoryStrength(vocab[w].exposures, vocab[w].lastSeen, now) }))
+    .map((w) => ({ word: w, m: memoryStrength(vocab[w], now) }))
     .sort((a, b) => a.m - b.m)
     .slice(0, limit);
 }

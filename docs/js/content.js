@@ -98,6 +98,7 @@ export const content = {
   language: null,     // the active language descriptor
   manifest: null,
   dict: {},
+  forms: {},          // inflected form -> the dictionary entry it belongs to
   patterns: [],
   lessons: [],
   scenarios: [],
@@ -188,6 +189,7 @@ function applyPack(pack) {
   content.language = pack.language;
   content.manifest = pack.manifest;
   content.dict = pack.dict || {};
+  content.forms = pack.forms || {};
   content.patterns = pack.patterns || [];
   content.lessons = pack.lessons || [];
   content.scenarios = pack.scenarios || [];
@@ -232,6 +234,7 @@ function applyBundle(lang, bundle, onProgress) {
     language: { ...lang, speech: bundle.speech || lang.speech || null },
     manifest,
     dict: bundle.dictionary || {},
+    forms: bundle.forms || {},
     patterns: bundle.patterns || [],
     lessons: (bundle.lessons || []).map(asLesson),
     scenarios: (bundle.scenarios || []).map(asScenario),
@@ -323,7 +326,10 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
     } catch {}
   }
 
-  const pack = { language: lang, manifest, dict, patterns, lessons, scenarios, verbs, momo, fetchedAt: Date.now() };
+  // No forms map on this path: it is built by the content repo's CI alongside
+  // pack.json, and this branch only runs for content old enough not to have
+  // one. Lookups fall back to exact matches, exactly as they used to.
+  const pack = { language: lang, manifest, dict, forms: {}, patterns, lessons, scenarios, verbs, momo, fetchedAt: Date.now() };
   applyPack(pack);
   const stored = cacheWrite(CK.pack(lang.code), pack);
   onProgress({ phase: 'done', done: total, total, stored });
@@ -372,6 +378,23 @@ export function scenariosByPhase() {
 
 export function lookup(word) {
   return content.dict[word] || null;
+}
+
+/**
+ * The dictionary entry a word on the page belongs to, or null.
+ *
+ * Spanish inflects hard, and the dictionary is keyed on lemmas. Matching only
+ * exact keys meant "hablas", "pregunto" and "palabras" were dead on the page —
+ * no meaning, no exposure, no colour — and worse, "cosa" and "cosas" were two
+ * unrelated memories that decayed separately, so knowing one earned you
+ * nothing for the other. Resolving through the forms map makes a word one
+ * word, however it is spelt on the day.
+ */
+export function resolve(word) {
+  if (!word) return null;
+  if (content.dict[word]) return word;
+  const lemma = content.forms[word];
+  return lemma && content.dict[lemma] ? lemma : null;
 }
 
 export function cacheSize() {

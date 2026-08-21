@@ -89,7 +89,7 @@ export function recordExposure(words, times = 1) {
   const now = Date.now();
   for (const w of [].concat(words)) {
     if (!w) continue;
-    const e = v[w] || { exposures: 0, lastSeen: 0, hits: 0, misses: 0 };
+    const e = v[w] || { exposures: 0, lastSeen: 0, hits: 0, misses: 0, lookups: 0 };
     e.exposures = (e.exposures || 0) + times;
     e.lastSeen = now;
     v[w] = e;
@@ -97,13 +97,32 @@ export function recordExposure(words, times = 1) {
   vocab.save(v);
 }
 
-// Answering about a word — right answers strengthen, wrong ones mark a leech.
+// Answering about a word. A recall is its own event, worth three sightings in
+// the engine, so it does NOT also count as an exposure — that would make it
+// worth four and quietly re-merge the two things we just separated.
+//
+// A miss deliberately leaves `lastSeen` alone. Refreshing the clock on a wrong
+// answer would make being wrong about an old word RAISE its strength, which is
+// the opposite of what happened.
 export function recordAnswer(word, correct) {
   if (!word) return;
   const v = vocab.all();
-  const e = v[word] || { exposures: 0, lastSeen: 0, hits: 0, misses: 0 };
-  if (correct) { e.hits = (e.hits || 0) + 1; e.exposures = (e.exposures || 0) + 1; e.lastSeen = Date.now(); }
+  const e = v[word] || { exposures: 0, lastSeen: 0, hits: 0, misses: 0, lookups: 0 };
+  if (correct) { e.hits = (e.hits || 0) + 1; e.lastSeen = Date.now(); }
   else { e.misses = (e.misses || 0) + 1; }
+  v[word] = e;
+  vocab.save(v);
+}
+
+// Tapping a word for its meaning. This is the clearest signal in the app that
+// you do NOT know a word, and it used to be recorded as evidence that you did.
+// Like a miss it leaves `lastSeen` alone: looking a word up is not a reason for
+// it to look fresher than it is.
+export function recordLookup(word) {
+  if (!word) return;
+  const v = vocab.all();
+  const e = v[word] || { exposures: 0, lastSeen: 0, hits: 0, misses: 0, lookups: 0 };
+  e.lookups = (e.lookups || 0) + 1;
   v[word] = e;
   vocab.save(v);
 }

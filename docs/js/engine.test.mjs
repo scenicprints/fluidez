@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  memoryStrength, band, tokenize, cleanWord, conjugate, calcFluency,
+  memoryStrength, evidence, band, tokenize, cleanWord, conjugate, calcFluency,
   fadingWords, leeches, gradeTyped, normalizeAnswer, orderCandidates,
   scramble, generateExercises, phaseName,
 } from './engine.js';
@@ -22,34 +22,92 @@ const NOW = 1_700_000_000_000;
 
 // ── decay ───────────────────────────────────────────────────
 test('unseen words have no strength', () => {
-  assert.equal(memoryStrength(0, NOW, NOW), 0);
+  assert.equal(memoryStrength({}, NOW), 0);
+  assert.equal(memoryStrength({ exposures: 0, lastSeen: NOW }, NOW), 0);
 });
 
-test('one exposure is capped at 1/5 even when brand new', () => {
+test('one sighting is barely anything', () => {
   // min(1, 1/5) = 0.2, times 2^0 = 1
-  assert.equal(memoryStrength(1, NOW, NOW).toFixed(4), '0.2000');
+  assert.equal(memoryStrength({ exposures: 1, lastSeen: NOW }, NOW).toFixed(4), '0.2000');
 });
 
-test('five exposures at zero elapsed time is full strength', () => {
-  assert.equal(memoryStrength(5, NOW, NOW), 1);
+test('one sighting halves after exactly one half-life (24h)', () => {
+  assert.equal(memoryStrength({ exposures: 1, lastSeen: NOW - 24 * HOUR }, NOW).toFixed(4), '0.1000');
 });
 
-test('one exposure halves after exactly one half-life (24h)', () => {
-  assert.equal(memoryStrength(1, NOW - 24 * HOUR, NOW).toFixed(4), '0.1000');
+test('the half-life stretches with sqrt(evidence)', () => {
+  // Evidence 4 -> half-life 48h. After 48h: min(1,4/5)=0.8, halved = 0.4.
+  // One sighting plus one recall is evidence 4, and having a recall behind it
+  // is also what lets the ceiling reach 0.8 in the first place.
+  assert.equal(memoryStrength({ exposures: 1, hits: 1, lastSeen: NOW - 48 * HOUR }, NOW).toFixed(4), '0.4000');
+  // Read four times and never recalled, the same word is held under the
+  // "Locked in" line, so it decays from 0.79 instead.
+  assert.equal(memoryStrength({ exposures: 4, lastSeen: NOW - 48 * HOUR }, NOW).toFixed(4), '0.3950');
 });
 
-test('the half-life stretches with sqrt(exposures)', () => {
-  // 4 exposures -> half-life 48h. After 48h: min(1,4/5)=0.8, halved = 0.4
-  assert.equal(memoryStrength(4, NOW - 48 * HOUR, NOW).toFixed(4), '0.4000');
+test('reading alone can never lock a word in', () => {
+  // This is the whole point of separating the two. However much text has gone
+  // past your eyes, without one recall it stops at the top of "Growing".
+  for (const n of [5, 20, 500]) {
+    const m = memoryStrength({ exposures: n, lastSeen: NOW }, NOW);
+    assert.ok(m < 0.8, `${n} sightings reached ${m}`);
+    assert.equal(band(m).key, 'growing');
+  }
+});
+
+test('one recall is what locks it in', () => {
+  const read = memoryStrength({ exposures: 5, lastSeen: NOW }, NOW);
+  const recalled = memoryStrength({ exposures: 5, hits: 1, lastSeen: NOW }, NOW);
+  assert.ok(recalled > read);
+  assert.equal(band(recalled).key, 'strong');
+});
+
+test('a recall is worth three sightings, and then some', () => {
+  // The weight itself: one recall carries as much as three sightings.
+  assert.equal(evidence({ exposures: 0, hits: 1 }), 3);
+  assert.equal(evidence({ exposures: 3 }), 3);
+  assert.equal(evidence({ exposures: 6, hits: 1 }), evidence({ exposures: 9 }));
+
+  // Equal weight means an equal half-life — but the recalled word is also the
+  // only one of the two allowed past the "Locked in" line, so it ends higher.
+  // That gap is the testing effect, and it is meant to be there.
+  const read = memoryStrength({ exposures: 9, lastSeen: NOW - 100 * HOUR }, NOW);
+  const recalled = memoryStrength({ exposures: 6, hits: 1, lastSeen: NOW - 100 * HOUR }, NOW);
+  assert.ok(recalled > read, `${recalled} should beat ${read} on equal weight`);
+});
+
+test('a miss costs more than a sighting is worth', () => {
+  // Otherwise reading drowns out being wrong, which is how a word missed five
+  // times could still read "Locked in".
+  assert.equal(evidence({ exposures: 10, misses: 1 }), 8);
+  assert.ok(evidence({ exposures: 10, misses: 5 }) < evidence({ exposures: 10 }));
+  assert.equal(evidence({ exposures: 2, misses: 9 }), 0);
+});
+
+test('being wrong never refreshes the clock', () => {
+  // A miss must not be able to RAISE strength by making an old word look
+  // recently met. Same lastSeen, more misses, strictly weaker.
+  const seen = NOW - 200 * HOUR;
+  const clean = memoryStrength({ exposures: 12, lastSeen: seen }, NOW);
+  const missed = memoryStrength({ exposures: 12, misses: 3, lastSeen: seen }, NOW);
+  assert.ok(missed < clean, `${missed} should be below ${clean}`);
+});
+
+test('looking a word up counts against you, but only so far', () => {
+  const known = { exposures: 12, hits: 2, lastSeen: NOW };
+  const tapped = { ...known, lookups: 1 };
+  assert.ok(memoryStrength(tapped, NOW) <= memoryStrength(known, NOW));
+  assert.ok(evidence(tapped) < evidence(known));
+  // The word sheet is also how you hear a word said aloud, so curiosity is
+  // capped: past three taps it costs nothing more.
+  assert.equal(evidence({ ...known, lookups: 3 }), evidence({ ...known, lookups: 40 }));
 });
 
 test('strength stays inside 0..1 and decays to nothing', () => {
-  // Exponential decay never reaches exactly zero — matching the Dart — but it
-  // gets far below any threshold the app cares about.
-  const ancient = memoryStrength(9, NOW - 10000 * HOUR, NOW);
+  const ancient = memoryStrength({ exposures: 9, lastSeen: NOW - 10000 * HOUR }, NOW);
   assert.ok(ancient >= 0 && ancient < 1e-9, `expected ~0, got ${ancient}`);
   assert.ok(band(ancient).key === 'new');
-  assert.ok(memoryStrength(50, NOW, NOW) <= 1);
+  assert.ok(memoryStrength({ exposures: 50, hits: 20, lastSeen: NOW }, NOW) <= 1);
 });
 
 // ── bands ───────────────────────────────────────────────────
@@ -157,7 +215,7 @@ test('a perfect score on everything is 100% and B1', () => {
 
 test('milestones fire on the thresholds they claim', () => {
   const vocab = {};
-  for (let i = 0; i < 50; i++) vocab['w' + i] = { exposures: 5, lastSeen: Date.now() };
+  for (let i = 0; i < 50; i++) vocab['w' + i] = { exposures: 5, hits: 1, lastSeen: Date.now() };
   const f = calcFluency(vocab, {}, [], totals);
   const titles = f.milestones.map((m) => m.title);
   assert.ok(titles.includes('First 10 words'));
