@@ -219,6 +219,58 @@ export function calcFluency(vocab, progress, unlockedPatterns, totals) {
   };
 }
 
+// SCHEDULING
+//
+// The decay curve already knew exactly when a word would slip. Nothing ever
+// asked it. The app estimated strength continuously, sorted the Review screen
+// weakest-first, and then waited for you to go looking - so the model was a
+// dashboard rather than a teacher, and a word could rot for a month as long as
+// you never opened the right screen.
+//
+// This turns the curve into a date. Solve the decay for the moment strength
+// falls to REVIEW_AT and that is when the word is due:
+//
+//     strength(h) = 2^(-h/halfLife) * ceiling = REVIEW_AT
+//     h = halfLife * log2(ceiling / REVIEW_AT)
+//
+// REVIEW_AT is the bottom of "Growing", so a word is caught on its way down
+// rather than after it has already faded. A word whose ceiling is at or below
+// that line can never be above it - one sighting caps at 0.2 - so it is due
+// the moment it is met, which is correct: seeing a word once is not knowing it.
+const REVIEW_AT = 0.5;
+
+/** When this word next needs pulling out of your head. */
+export function dueAt(v = {}) {
+  const weight = evidence(v);
+  const seen = v.lastSeen || 0;
+  if (!weight) return seen;
+  let ceiling = Math.min(1, weight / 5);
+  if (!(v.hits > 0)) ceiling = Math.min(ceiling, READING_CEILING);
+  if (ceiling <= REVIEW_AT) return seen;
+  const halfLife = HALF_LIFE_HOURS * Math.sqrt(weight);
+  return seen + halfLife * Math.log2(ceiling / REVIEW_AT) * 3600000;
+}
+
+/** Everything owed right now, most overdue first. */
+export function dueWords(vocab, dict, nowMs = Date.now(), limit = 40) {
+  return Object.keys(vocab)
+    .filter((w) => dict[w] && (vocab[w].exposures || 0) >= 1)
+    .map((w) => ({ word: w, due: dueAt(vocab[w]), m: memoryStrength(vocab[w], nowMs) }))
+    .filter((x) => x.due <= nowMs)
+    .sort((a, b) => a.due - b.due)
+    .slice(0, limit);
+}
+
+/** How many words are owed, for the number on the Today screen. */
+export function dueCount(vocab, dict, nowMs = Date.now()) {
+  let n = 0;
+  for (const w of Object.keys(vocab)) {
+    if (!dict[w] || !(vocab[w].exposures || 0)) continue;
+    if (dueAt(vocab[w]) <= nowMs) n++;
+  }
+  return n;
+}
+
 // ── REVIEW QUEUE ────────────────────────────────────────────
 // The decay model already knows exactly what is slipping; this surfaces it.
 // Weakest first, but only words actually met at least once.
@@ -255,9 +307,11 @@ export { shuffle, pick };
 
 const firstSense = (en) => String(en).split('/')[0].trim();
 
-export function generateExercises(vocab, dict, lessons, count = 12, modes = null) {
+export function generateExercises(vocab, dict, lessons, count = 12, modes = null, queue = null) {
   const distractorPool = Object.keys(dict).filter((k) => !SKIP_POS.includes(dict[k].pos));
-  const review = fadingWords(vocab, dict, 30);
+  // The scheduler's queue when there is one, weakest-first as the fallback for
+  // a learner with nothing due yet.
+  const review = (queue && queue.length) ? queue : fadingWords(vocab, dict, 30);
   const sentences = lessons.flatMap((l) => l.sentences || []);
 
   // Which exercise kinds this language can actually support.

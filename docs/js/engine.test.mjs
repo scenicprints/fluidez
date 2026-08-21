@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  memoryStrength, evidence, band, tokenize, cleanWord, conjugate, calcFluency,
+  memoryStrength, evidence, dueAt, dueWords, dueCount, band, tokenize, cleanWord, conjugate, calcFluency,
   fadingWords, leeches, gradeTyped, normalizeAnswer, orderCandidates,
   scramble, generateExercises, phaseName,
 } from './engine.js';
@@ -228,6 +228,46 @@ test('faded words stop counting as known', () => {
   const old = Date.now() - 5000 * HOUR;
   const vocab = { uno: { exposures: 1, lastSeen: old } };
   assert.equal(calcFluency(vocab, {}, [], totals).known, 0);
+});
+
+test('a word met once is due immediately', () => {
+  // One sighting caps strength at 0.2, which is below the review line, so it
+  // can never be above it. Seeing a word once is not knowing it.
+  assert.equal(dueAt({ exposures: 1, lastSeen: NOW }), NOW);
+});
+
+test('a well-held word is not due for days', () => {
+  const strong = { exposures: 4, hits: 3, lastSeen: NOW };
+  const hours = (dueAt(strong) - NOW) / HOUR;
+  assert.ok(hours > 48, `expected days, got ${hours.toFixed(1)}h`);
+});
+
+test('recalling a word pushes its due date out', () => {
+  const read = { exposures: 8, lastSeen: NOW };
+  const recalled = { exposures: 5, hits: 1, lastSeen: NOW };
+  assert.ok(dueAt(recalled) > dueAt(read), 'a recall must buy more time than a sighting');
+});
+
+test('missing a word brings it forward', () => {
+  const clean = { exposures: 6, hits: 2, lastSeen: NOW };
+  const missed = { ...clean, misses: 2 };
+  assert.ok(dueAt(missed) < dueAt(clean));
+});
+
+test('the queue is most overdue first, and only what is actually owed', () => {
+  const d = { uno: { en: 'one' }, dos: { en: 'two' }, tres: { en: 'three' } };
+  const v = {
+    uno: { exposures: 1, lastSeen: NOW - 100 * HOUR },        // long overdue
+    dos: { exposures: 1, lastSeen: NOW - 2 * HOUR },           // overdue
+    tres: { exposures: 4, hits: 4, lastSeen: NOW },            // held, not due
+  };
+  assert.deepEqual(dueWords(v, d, NOW).map((x) => x.word), ['uno', 'dos']);
+  assert.equal(dueCount(v, d, NOW), 2);
+});
+
+test('a word never met is not in the queue', () => {
+  const d = { uno: { en: 'one' } };
+  assert.deepEqual(dueWords({ uno: { exposures: 0, lastSeen: 0 } }, d, NOW), []);
 });
 
 // ── review queues ───────────────────────────────────────────

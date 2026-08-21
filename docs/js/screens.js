@@ -10,7 +10,7 @@ import * as speech from './speech.js';
 import { content, lessonsByPhase, checkForContentUpdate, cacheSize, packVersion, resolve } from './content.js';
 import { MOMO_MINI, momoSvg, createMomo, daysBetween } from './momo.js';
 import {
-  memoryStrength, band, calcFluency, fadingWords, leeches, tokenize, cleanWord,
+  memoryStrength, band, calcFluency, fadingWords, dueWords, dueCount, leeches, tokenize, cleanWord,
   conjugate, generateExercises, gradeTyped, orderCandidates, scramble, shuffle, pick,
   phaseName, phaseDesc, levelRank,
 } from './engine.js';
@@ -166,14 +166,15 @@ export function renderToday() {
   }
 
   // the tiles this language actually supports
-  const fadingCount = fadingWords(store.vocab.all(), content.dict, 500).filter((x) => x.m < 0.5).length;
+  // What the scheduler says is owed today, not what merely looks weak.
+  const owed = dueCount(store.vocab.all(), content.dict);
   const tiles = [];
   const add = (feature, icon, name, count, fn) => {
     if (feature && !content.has(feature)) return;
     tiles.push({ icon, name, count, fn });
   };
   add('scenes', 'ic-scenes', 'Scenes', `${content.scenarios.length} · ${(prog.scenariosDone || []).length} done`, () => showScreen('scenes'));
-  add('review', 'ic-target', 'Review', fadingCount ? `${fadingCount} fading` : 'all fresh', () => startReview());
+  add('review', 'ic-target', 'Review', owed ? `${owed} due` : 'nothing due', () => startReview());
   add('verbs', 'ic-verb', 'Verbs', content.verbs ? 'conjugation' : '—', () => startVerbs());
   add('order', 'ic-order', 'Word order', 'build it', () => startOrder());
   add('audio', 'ic-ear', 'Listening', 'dictation', () => startDictation());
@@ -1210,9 +1211,13 @@ function renderWrap() {
 export function startReview() {
   const kinds = ['es_en', 'en_es', 'gap'];
   if (content.lessons.length) kinds.push('type_es');
-  const items = generateExercises(store.vocab.all(), content.dict, content.lessons, 12, kinds);
+  // Due first. The scheduler decides what is asked, which is the whole point
+  // of having one; with nothing due yet the engine falls back to weakest-first.
+  const vocab = store.vocab.all();
+  const queue = dueWords(vocab, content.dict, Date.now(), 30);
+  const items = generateExercises(vocab, content.dict, content.lessons, 12, kinds, queue);
   startDrill({
-    title: 'Review', sub: 'Weakest words first', items,
+    title: 'Review', sub: queue.length ? `${queue.length} due` : 'Weakest words first', items,
     render: (pad, item, done) => renderExercise(pad, item, done),
   });
 }
