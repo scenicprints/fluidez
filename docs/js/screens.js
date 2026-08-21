@@ -94,7 +94,11 @@ function paintLevel() {
   }
   const chip = $('langChip');
   if (chip && content.language) {
-    chip.innerHTML = `${esc(content.language.flag || '🌐')} ${esc(String(content.language.name || '').toUpperCase())} ▾`;
+    // The caret is a promise that tapping does something. With one language in
+    // the registry it does not, so it is not offered.
+    const pickable = content.languages.length > 1;
+    chip.innerHTML = `${esc(content.language.flag || '🌐')} ${esc(String(content.language.name || '').toUpperCase())}${pickable ? ' ▾' : ''}`;
+    chip.classList.toggle('fixed', !pickable);
   }
 }
 
@@ -882,7 +886,10 @@ function renderSearch(query) {
 function openWordFromList(w) {
   const d = content.dict[w];
   if (!d) return;
-  toast(`<b>${esc(w)}</b> — ${esc(d.en)}${d.note ? '. ' + esc(d.note) : ''}`, 4200);
+  // toast() runs md(), which escapes first and only then honours **bold** —
+  // so real <b> tags handed to it came out on screen as literal markup.
+  // Markdown in, and no esc() here: md() does the escaping.
+  toast(`**${w}** — ${d.en}${d.note ? '. ' + d.note : ''}`, 4200);
   if (canAudio()) { speech.warmUp(); speech.speak(w, speakOpts()); }
 }
 
@@ -1589,8 +1596,12 @@ export function renderSettings() {
   };
 
   group('Learning');
-  row('Language', 'Switches lessons, words and voice',
-    `${esc(content.language?.flag || '')} ${esc(content.language?.name || '')} ›`, () => onSwitchLanguage());
+  // A switcher with one destination is a dead end. Shown as a plain fact
+  // instead, so the course you are on is still on the screen.
+  const canSwitch = content.languages.length > 1;
+  row('Language', canSwitch ? 'Switches lessons, words and voice' : 'The course you are learning',
+    `${esc(content.language?.flag || '')} ${esc(content.language?.name || '')}${canSwitch ? ' ›' : ''}`,
+    canSwitch ? () => onSwitchLanguage() : null);
 
   const goalRow = el('div', 'setrow');
   goalRow.innerHTML = '<span><span class="k">Daily goal</span><span class="kd">Reps to keep the streak alive</span></span>';
@@ -1602,7 +1613,7 @@ export function renderSettings() {
       store.daily.setGoal(n);
       seg.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
       b.classList.add('on');
-      toast(`Daily goal set to <b>${n}</b>`);
+      toast(`Daily goal set to **${n}**`);
     });
     seg.appendChild(b);
   }
@@ -1708,7 +1719,7 @@ function wire() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(renderWords, 120);
   });
-  $('langChip').addEventListener('click', () => onSwitchLanguage());
+  $('langChip').addEventListener('click', () => { if (content.languages.length > 1) onSwitchLanguage(); });
   for (const id of ['levelChip', 'levelChip2', 'levelChip3', 'levelChip4']) {
     $(id)?.addEventListener('click', () => { showScreen('fluency'); renderFluency(); });
   }

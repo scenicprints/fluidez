@@ -240,12 +240,23 @@ export function generateExercises(vocab, dict, lessons, count = 12, modes = null
 
     } else if (kind === 'gap' && sentences.length) {
       const sn = pick(sentences);
-      const candidates = tokenize(sn.es).filter((t) => t.isWord && dict[t.lower]);
+      const toks = tokenize(sn.es);
+      const candidates = toks
+        .map((t, at) => ({ ...t, at }))
+        .filter((t) => t.isWord && dict[t.lower]);
       if (candidates.length < 2) continue;
       const target = pick(candidates);
+      // Blank the token that was actually chosen, by position.
+      //
+      // This used to be sn.es.replace(target.raw, ...), which replaces the
+      // first SUBSTRING match anywhere in the sentence — so picking "que"
+      // gutted the "que" inside "querés", and picking "y" hollowed out
+      // "Hay". 310 of 6304 possible items on the Nicaraguan course came out
+      // mangled that way. tokenize() covers the whole string with no gaps,
+      // so joining the tokens back rebuilds the sentence exactly.
       out.push({
         kind,
-        sentence: sn.es.replace(target.raw, ' ______ '),
+        sentence: toks.map((t, at) => (at === target.at ? ' ______ ' : t.raw)).join(''),
         translation: sn.en,
         correct: target.lower,
         options: shuffle([target.lower, ...wrongWords(target.lower)]),

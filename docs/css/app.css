@@ -73,6 +73,9 @@ button { font-family: inherit; color: inherit; }
   font-size: 9.5px; letter-spacing: .15em; text-transform: uppercase; color: var(--txt3);
   background: none; border: 0; padding: 0; cursor: pointer;
 }
+/* Only one language in the registry: the chip states the course rather than
+   offering to change it, so it must not look pressable. */
+.sub-lang.fixed { cursor: default; pointer-events: none; }
 .topright { display: flex; align-items: center; gap: 8px; }
 
 .levelchip {

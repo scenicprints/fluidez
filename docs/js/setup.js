@@ -144,13 +144,36 @@ export async function showLanguagePicker({ standalone = false, code = null, forc
     if (lang) return ensurePack(lang, { standalone, force: true });
   }
 
-  showPane('lang');
+  // One language is not a choice, so do not ask. Fluidez ships Nicaraguan
+  // Spanish and nothing else; the picker stays in the code for the day the
+  // registry lists a second one again, and comes back on its own when it does.
+  //
+  // The download pane goes up first because working out which languages exist
+  // means reaching GitHub, and either answer continues from this same screen.
+  showPane('download');
+  $('dlText').textContent = 'Reading the course list…';
+  $('dlBar').style.width = '0%';
+  $('dlError').style.display = 'none';
+  $('dlRetry').style.display = 'none';
 
-  // Paint whatever is already known first — the cached registry, or at worst
-  // the built-in fallback. A slow network must never leave this on a spinner.
-  paintLanguages(standalone, force);
   await loadLanguages();
+  if (content.languages.length === 1) {
+    return chooseLanguage(content.languages[0], standalone, force);
+  }
+
+  showPane('lang');
   paintLanguages(standalone, force);
+}
+
+/** Commit to a language: remember it, tell the account, fetch the course. */
+async function chooseLanguage(lang, standalone, force) {
+  const current = store.settings.get('language');
+  store.settings.set('language', lang.code);
+  if (account) {
+    account.language = lang.code;
+    cloud.updateAccount(account.userId, { language: lang.code });
+  }
+  await ensurePack(lang, { standalone, force: force && lang.code === current });
 }
 
 function paintLanguages(standalone, force = false) {
@@ -165,14 +188,7 @@ function paintLanguages(standalone, force = false) {
       `<span class="flag">${esc(lang.flag || '🌐')}</span>` +
       `<span><span class="nm">${esc(lang.name || lang.code)}</span>` +
       `<span class="meta">${esc(lang.blurb || lang.code)}</span></span>`;
-    row.addEventListener('click', async () => {
-      store.settings.set('language', lang.code);
-      if (account) {
-        account.language = lang.code;
-        cloud.updateAccount(account.userId, { language: lang.code });
-      }
-      await ensurePack(lang, { standalone, force: force && lang.code === current });
-    });
+    row.addEventListener('click', () => chooseLanguage(lang, standalone, force));
     list.appendChild(row);
   }
 }

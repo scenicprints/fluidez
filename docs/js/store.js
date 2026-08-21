@@ -9,7 +9,7 @@ const NS = 'fl';
 let userId = null;
 let onChange = () => {};
 
-export function setUser(id) { userId = id; }
+export function setUser(id) { userId = id; adoptStamp(); }
 export function currentUser() { return userId; }
 export function onStoreChange(fn) { onChange = fn; }
 
@@ -23,8 +23,47 @@ function read(name, fallback) {
   } catch { return fallback; }
 }
 
+// Which fields make up the snapshot the cloud mirrors. Writing one of them
+// stamps `updatedAt`, and that stamp is the only honest answer to "is this
+// device's copy newer than the cloud's?".
+//
+// It must be persisted, not computed. snapshot() used to report Date.now(),
+// which made every comparison against it read "local is newer" — so the
+// returning-user pull in app.js could never fire, and a second device would
+// quietly push its stale progress over the first one's.
+//
+// Only synced fields touch it. Momo remembering a line he has said is not a
+// change worth blocking a pull over.
+const SYNCED = new Set([
+  'vocab', 'progress', 'patterns', 'settings',
+  'streak', 'longest', 'lastActive', 'todayCount',
+]);
+
+function stamp(ms = Date.now()) {
+  try { localStorage.setItem(key('updatedAt'), JSON.stringify(ms)); } catch {}
+}
+
+/** When this device's synced state last changed. 0 means "never touched". */
+export function lastChanged() { return read('updatedAt', 0) || 0; }
+
+/**
+ * Devices that predate the stamp have no `updatedAt` at all, which reads as
+ * "never changed" — and that would let the very first launch after this
+ * upgrade pull an older cloud copy over a session this phone did offline and
+ * never managed to push. So a device that already has progress on it counts
+ * as having changed now; only a genuinely empty one stays at zero.
+ */
+function adoptStamp() {
+  if (!userId) return;
+  if (read('updatedAt', null) !== null) return;
+  const used = Object.keys(vocab.all()).length > 0 ||
+    (progress.all().storiesRead || []).length > 0;
+  stamp(used ? Date.now() : 0);
+}
+
 function write(name, value) {
   try { localStorage.setItem(key(name), JSON.stringify(value)); } catch {}
+  if (SYNCED.has(name)) stamp();
   onChange(name, value);
 }
 
@@ -193,7 +232,7 @@ export function snapshot() {
     longest: daily.longest(),
     lastActive: daily.lastActive(),
     todayCount: read('todayCount', 0),
-    updatedAt: Date.now(),
+    updatedAt: lastChanged(),
   };
 }
 
@@ -208,6 +247,10 @@ export function restore(snap) {
   if (typeof snap.longest === 'number') write('longest', snap.longest);
   if (snap.lastActive) write('lastActive', snap.lastActive);
   if (typeof snap.todayCount === 'number') write('todayCount', snap.todayCount);
+  // Adopt the cloud's own stamp, not "now". The device has not changed
+  // anything, it has caught up — so the next comparison must still be able to
+  // tell that a third device pushing later is newer than this.
+  if (typeof snap.updatedAt === 'number') stamp(snap.updatedAt);
 }
 
 export function wipeUser(id) {

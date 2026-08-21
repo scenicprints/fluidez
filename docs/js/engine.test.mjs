@@ -261,6 +261,35 @@ test('multiple-choice exercises always include the right answer', () => {
   }
 });
 
+test('a gap blank replaces the whole token, never a substring of another word', () => {
+  // "que" lives inside "querés", and "y" inside "Hay". The old code blanked the
+  // first substring match, so the wrong word was gutted: "¿Qué __ rés comer?".
+  const d = { que: { en: 'that', pos: 'conj' }, comer: { en: 'to eat', pos: 'verb' },
+              hay: { en: 'there is', pos: 'verb' }, y: { en: 'and', pos: 'conj' },
+              gente: { en: 'people', pos: 'noun' }, ruido: { en: 'noise', pos: 'noun' } };
+  const ls = [{ id: 'g1', title: 'G', phase: 0, sentences: [
+    { es: '¿Qué querés comer que hay?', en: 'What is there that you want to eat?' },
+    { es: 'Hay gente y ruido.', en: 'There are people and noise.' },
+  ] }];
+  const v = {}; for (const w of Object.keys(d)) v[w] = { exposures: 2, lastSeen: Date.now() };
+  const BLANK = ' ______ ';
+  for (let i = 0; i < 200; i++) {
+    for (const e of generateExercises(v, d, ls, 6, ['gap'])) {
+      const at = e.sentence.indexOf(BLANK);
+      assert.ok(at !== -1, `gap item lost its blank: ${e.sentence}`);
+      const before = e.sentence.slice(0, at);
+      const after = e.sentence.slice(at + BLANK.length);
+      // A blank standing where a whole word stood never touches a letter.
+      assert.ok(!/\p{L}$/u.test(before), `blank cut into a word: ${e.sentence}`);
+      assert.ok(!/^\p{L}/u.test(after), `blank cut into a word: ${e.sentence}`);
+      // And the answer must be the word that was actually taken out.
+      const restored = e.sentence.replace(BLANK, e.correct).toLowerCase();
+      assert.ok(ls[0].sentences.some((x) => x.es.toLowerCase() === restored),
+        `restoring the answer did not rebuild the sentence: ${restored}`);
+    }
+  }
+});
+
 test('an empty library still produces a fallback rather than crashing', () => {
   const ex = generateExercises({}, {}, [], 5);
   assert.equal(ex.length, 1);

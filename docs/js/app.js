@@ -299,8 +299,12 @@ async function boot() {
   if (lang && loadCachedPack(code)) {
     launch({ userId, name: session.name });
     // Catch up with the cloud quietly, without holding anything up.
+    // Compare against the PERSISTED stamp of the last local change, never a
+    // freshly minted Date.now() — that comparison is always false, which is
+    // how this pull sat dead while the push kept running, and a second device
+    // could overwrite the first one's progress with an older copy.
     cloud.pullProgress(userId).then((remote) => {
-      if (remote && remote.updatedAt > (store.snapshot().updatedAt || 0)) {
+      if (remote && (remote.updatedAt || 0) > store.lastChanged()) {
         store.restore(remote);
         screens.renderToday();
       }
