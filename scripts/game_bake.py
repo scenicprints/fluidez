@@ -55,6 +55,21 @@ PLACE = {
     'centro-10': (u'Parque Central', -4, -7, None),
     'centro-11': (u'Plazuela de los Leones', 4, 6, None),
     'centro-12': (u'Parque Central', 8, -2, None),
+    # El Mercado. The market building itself is a solid block of awning, so
+    # these sit in the streets and doorways around it, which is where the
+    # stalls really spill out to.
+    'mercado-01': (u'Mercado Municipal', -7, 4, None),
+    'mercado-02': (u'Mercado Municipal', 9, -7, None),
+    'mercado-03': (u'Mercado Municipal', 4, 6, None),
+    'mercado-04': (u'Mercado Municipal', -5, 9, None),
+    'mercado-05': (u'Mercado Municipal', 11, 7, None),
+    'mercado-06': (u'Mercado Municipal', -10, -4, None),
+    'mercado-07': (u'Mercado Municipal', 6, -8, None),
+    'mercado-08': (u'Mercado Municipal', -3, -10, None),
+    'mercado-09': (u'Mercado Municipal', 8, 10, None),
+    'mercado-10': (u'Mercado Municipal', -9, 8, None),
+    'mercado-11': (u'Supermercado Pal\xed Granada', 3, 5, None),
+    'mercado-12': (u'Mercado Municipal', 13, 2, None),
 }
 
 # Skin and shirt, drawn deterministically from the id so a face never changes
