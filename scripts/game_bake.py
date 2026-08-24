@@ -70,6 +70,30 @@ PLACE = {
     'mercado-10': (u'Mercado Municipal', -9, 8, None),
     'mercado-11': (u'Supermercado Pal\xed Granada', 3, 5, None),
     'mercado-12': (u'Mercado Municipal', 13, 2, None),
+    # Xalteva, the old quarter west of the centre. The sacristan and the beata
+    # are at the church door, the cemetery keeper is at the cemetery, and the
+    # historian is beside the walls he is talking about.
+    'xalteva-01': (u'Plaza Xalteva', -5, 6, None),
+    'xalteva-02': (u'Iglesia de Xalteva', 0, 6, None),
+    'xalteva-03': (u'Iglesia de Xalteva', 6, 8, None),
+    'xalteva-04': (u'Plaza Xalteva', 9, -5, None),
+    'xalteva-05': (u'Plaza Xalteva', -11, -3, None),
+    'xalteva-06': (u'Plaza Xalteva', 7, 10, 'bici'),
+    'xalteva-07': (u'Fortaleza La Polvora', 11, 8, None),
+    'xalteva-08': (u'Cementerio Municipal de Granada', 2, -7, None),
+    'xalteva-09': (u'Iglesia de Xalteva', -8, 4, None),
+    'xalteva-10': (u'Fortaleza La Polvora', 5, -4, None),
+    # Guadalupe, sloping east towards the water, around its church.
+    'guadalupe-01': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', -9, 5, None),
+    'guadalupe-02': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', 10, 7, 'moto'),
+    'guadalupe-03': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', -6, -9, None),
+    'guadalupe-04': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', 6, -7, None),
+    'guadalupe-05': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', -12, -2, None),
+    'guadalupe-06': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', 3, 11, None),
+    'guadalupe-07': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', 12, -3, None),
+    'guadalupe-08': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', -3, 9, None),
+    'guadalupe-09': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', 9, 13, None),
+    'guadalupe-10': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', -10, 12, None),
 }
 
 # Skin and shirt, drawn deterministically from the id so a face never changes

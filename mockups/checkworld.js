@@ -137,8 +137,19 @@ for (const n of P.NPCS) {
   check(n.x > 0 && n.y > 0 && n.x < P.W && n.y < P.H, `${n.id} is on the map`);
   check(!P.SOLID.has(P.at(n.x, n.y)), `${n.id} is standing somewhere you can reach`,
         `tile ${P.at(n.x, n.y)} at ${n.x},${n.y}`);
-  const d = Math.hypot(n.x * 16 - P.S.px, n.y * 16 - P.S.py);
-  check(d < 4000, `${n.id} is not on the other side of the city`, `${d | 0}px`);
+  // NOT "close to where you spawn". That check was written when the world was
+  // one district and it failed the cemetery keeper, who is a kilometre and a
+  // half from Parque Central because the cemetery is. What matters is that
+  // placement put everybody near the place they were assigned to: if the
+  // slide onto reachable ground moved somebody a long way, they are no longer
+  // where the mission says they are.
+  const home = n.at && P.spot(n.at);
+  if (home) {
+    const want = { x: home.x + (n.dx || 0), y: home.y + (n.dy || 0) };
+    const slid = Math.hypot(n.x - want.x, n.y - want.y);
+    check(slid < 16, `${n.id} ended up near where it was placed`,
+          `slid ${slid.toFixed(0)} tiles (${(slid * 5) | 0} m) off ${n.at}`);
+  }
 }
 
 // ── 3b. you can actually get to all of them ──────────────────────────────
