@@ -115,6 +115,30 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 .help.cold { border: 0; background: none; padding: 0; margin: 12px 0 10px; }
 .help.cold .lab { color: var(--jade); margin: 0; }
 
+.bank { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 9px; }
+.ing {
+  display: flex; flex-direction: column; gap: 1px; padding: 6px 11px;
+  border: 1px solid var(--oro-d); border-radius: 10px; background: rgba(232,163,61,.07);
+}
+.ing b { font-size: 16.5px; color: var(--papel); font-weight: 500; }
+.ing i { font-size: 11px; color: var(--txt2); font-style: normal; }
+.help.hint .give { font-family: var(--sans); font-size: 15px; letter-spacing: 0; color: var(--txt); }
+
+.peek {
+  display: block; width: 100%; background: none; border: 0; color: var(--txt3);
+  font: inherit; font-size: 12px; cursor: pointer; padding: 2px 0 12px; text-align: left;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.peek:hover { color: var(--txt2); }
+.peek:focus-visible { outline: 2px solid var(--oro); outline-offset: 2px; border-radius: 4px; }
+.peeked {
+  font-size: 18px; color: var(--txt2); padding: 2px 0 12px; line-height: 1.3;
+}
+.peeked span {
+  display: block; font-family: var(--sans); font-size: 11px; color: var(--txt3);
+  letter-spacing: .08em; text-transform: uppercase; margin-top: 3px;
+}
+
 .answer { display: flex; gap: 8px; }
 .answer input {
   flex: 1; min-width: 0; background: var(--ceniza2); border: 1px solid var(--linea);
@@ -294,6 +318,7 @@ const NPCS = [
     beats:[
       { es:'Buenas. ¿En qué le ayudo?', objective:'Ask for a room', key:'buenas',
         say:'Buenas. Quiero un cuarto.', en:'Hello. I want a room.',
+        bank:[['Buenas','hello'],['quiero','I want'],['un cuarto','a room']],
         ok:['buenas quiero un cuarto','quiero un cuarto','quiero un cuarto por favor',
             'buenas quiero un cuarto por favor','quiero una habitacion','buenas quiero una habitacion'],
         teaches:['buenas','querer','cuarto'],
@@ -302,12 +327,14 @@ const NPCS = [
                 {es:'Soy de Estados Unidos.',en:'I am from the United States.'}] },
       { es:'¿Para cuántas noches?', objective:'Three nights', key:'tres noches',
         say:'Tres noches.', en:'Three nights.',
+        bank:[['tres','three'],['noches','nights']],
         ok:['tres noches','tres','por tres noches','para tres noches','son tres noches'],
         teaches:['tres','noche'],
         good:'Short is normal. Nobody builds a sentence for this.',
         decoys:[{es:'Tres córdobas.',en:'Three córdobas.'},{es:'A las tres.',en:'At three o’clock.'}] },
       { es:'Son quince dólares la noche. ¿Está bien?', objective:'Agree', key:'esta bien',
         say:'Está bien.', en:'That’s fine.',
+        bank:[['está','it is'],['bien','well, fine']],
         ok:['esta bien','si esta bien','si','esta bien gracias','si esta bien gracias','muy bien'],
         teaches:['estar','bien','quince'],
         good:'Está bien is the whole language for yes, agreed, fine, alright.',
@@ -320,6 +347,7 @@ const NPCS = [
     beats:[
       { es:'Buenas, ¿qué le doy?', objective:'Order gallo pinto', key:'por favor',
         say:'Buenas. Un gallo pinto, por favor.', en:'Hello. A gallo pinto, please.',
+        bank:[['Buenas','hello'],['un gallo pinto','rice and beans'],['por favor','please']],
         ok:['buenas un gallo pinto por favor','un gallo pinto por favor','gallo pinto por favor',
             'un gallo pinto','gallo pinto','quiero un gallo pinto','buenas un gallo pinto'],
         teaches:['gallo pinto','por favor'],
@@ -327,12 +355,14 @@ const NPCS = [
         decoys:[{es:'Un gallo, por favor.',en:'A rooster, please.'},{es:'Quiero comer.',en:'I want to eat.'}] },
       { es:'¿Y de tomar?', objective:'A coffee', key:'por favor',
         say:'Un café, por favor.', en:'A coffee, please.',
+        bank:[['un café','a coffee'],['por favor','please']],
         ok:['un cafe por favor','cafe por favor','un cafe','cafe','un cafe negro por favor','cafe negro'],
         teaches:['café','tomar'],
         good:'De tomar covers anything you drink, not just alcohol.',
         decoys:[{es:'Nada, gracias.',en:'Nothing, thanks.'},{es:'Agua, por favor.',en:'Water, please.'}] },
       { es:'Ahí le va, pues.', objective:'Ask what you owe', key:'cuanto le debo',
         say:'¿Cuánto le debo?', en:'How much do I owe you?',
+        bank:[['cuánto','how much'],['le debo','I owe you']],
         ok:['cuanto le debo','cuanto es','la cuenta por favor','cuanto vale','cuanto cuesta','cuanto le debo por favor'],
         teaches:['cuánto','deber'],
         good:'¿Cuánto le debo? is warmer than la cuenta. It assumes you are staying.',
@@ -345,18 +375,21 @@ const NPCS = [
     beats:[
       { es:'¿Para dónde vamos?', objective:'The market', key:'por favor',
         say:'Al mercado, por favor.', en:'To the market, please.',
+        bank:[['al mercado','to the market'],['por favor','please']],
         ok:['al mercado por favor','al mercado','mercado','al mercado municipal','quiero ir al mercado','voy al mercado'],
         teaches:['mercado','ir'],
         good:'Al mercado. Nobody in Granada uses a street name for anything.',
         decoys:[{es:'Al parque, por favor.',en:'To the park, please.'},{es:'No sé.',en:'I don’t know.'}] },
       { es:'Cien córdobas.', objective:'That is the chele price — offer eighty', key:'ochenta',
         say:'¿Ochenta?', en:'Eighty?',
+        bank:[['ochenta','eighty']],
         ok:['ochenta','ochenta cordobas','le doy ochenta','ochenta y ya','que sean ochenta','ochenta va'],
         teaches:['ochenta','córdoba'],
         good:'One word, said like a question. Haggling here is not an argument.',
         decoys:[{es:'Es muy caro.',en:'That is very expensive.'},{es:'Está bien.',en:'Fine.'}] },
       { es:'Ochenta y cinco y nos vamos.', objective:'Take it', key:'esta bien',
         say:'Está bien.', en:'Alright.',
+        bank:[['está','it is'],['bien','fine']],
         ok:['esta bien','si esta bien','esta bien vamos','vamos','si vamos','dale','si'],
         teaches:['bien'],
         good:'You met him in the middle. That is the entire ritual.',
@@ -639,12 +672,24 @@ const hintOf = (s) => s.replace(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/g, (w) =>
 
 function renderBeat() {
   const n = S.npc, beat = n.beats[S.beat], lvl = S.seen[beat.key] || 0;
+  // You are never handed the finished sentence. The first time you meet a
+  // phrase you get its INGREDIENTS, shuffled, and you put them together
+  // yourself — which you can do knowing no Spanish at all, and which is a
+  // real attempt rather than copying a line off the screen.
   let help;
-  if (lvl === 0) help = `<div class="help"><div class="lab">New — say this</div>
-      <div class="give es">${beat.say}</div><div class="en">${beat.en}</div></div>`;
-  else if (lvl === 1) help = `<div class="help hint"><div class="lab">You have had this once</div>
-      <div class="give es">${hintOf(beat.say)}</div><div class="en">${beat.en}</div></div>`;
-  else help = `<div class="help cold"><div class="lab">On your own</div></div>`;
+  if (lvl === 0) {
+    const bank = (beat.bank || []).slice().sort(() => Math.random() - 0.5);
+    help = `<div class="help"><div class="lab">New — build it from these</div>
+      <div class="bank">${bank.map(([es, en]) =>
+        `<span class="ing"><b class="es">${es}</b><i>${en}</i></span>`).join('')}</div>
+      <div class="en">You are saying: “${beat.en}”</div></div>`;
+  } else if (lvl === 1) {
+    help = `<div class="help hint"><div class="lab">You have had this once</div>
+      <div class="give">“${beat.en}”</div></div>`;
+  } else {
+    help = `<div class="help cold"><div class="lab">On your own</div></div>`;
+  }
+  help += `<button class="peek" id="peek" type="button">I am stuck — show me the line</button>`;
 
   $('panel').innerHTML =
     `<div style="display:flex;gap:10px;align-items:flex-start">
@@ -662,6 +707,10 @@ function renderBeat() {
        <button class="go" id="send" type="button">Say it</button>
      </div><div id="after"></div>`;
   $('send').addEventListener('click', submit);
+  $('peek').addEventListener('click', () => {
+    S.peeked = true;
+    $('peek').outerHTML = `<div class="peeked es">${beat.say}<span>you asked for this one</span></div>`;
+  });
   const inp = $('typed');
   inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') submit(); });
   setTimeout(() => inp.focus(), 50);

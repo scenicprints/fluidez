@@ -39,12 +39,21 @@ to learn?"* He is right. So instead **the help fades**:
 
 | times you have met the phrase | what you get |
 |---|---|
-| 0 | the whole line, to copy |
-| 1 | a hint — first letter of each word, plus the English |
-| 2+ | nothing |
+| 0 | the **ingredients**, shuffled — `quiero` (I want), `un cuarto` (a room) — and the English of what you are trying to say |
+| 1 | the English only |
+| 2+ | nothing but the situation |
 
 Get it wrong and the help comes back. Miss twice and three options appear, so
 you are never stuck. That means the game can be somebody's *only* way in.
+
+**Never show the finished sentence.** The first version of this handed you the
+whole line to copy and Kevin caught it immediately: *"It doesnt make sense that
+the answer is right there though. I dont even have to try."* He is right —
+copying a line you can see is transcription, not recall, and there is no
+learning in it. Giving the ingredients instead means a total beginner can still
+attempt it with no prior Spanish, but they have to **assemble** it, which is
+the actual skill. There is always an "I am stuck — show me the line" link, so
+the finished sentence is a choice you make rather than the default state.
 
 **You type your answer.** Not multiple choice — the app is already full of
 that, and recognising a sentence is not producing one.
