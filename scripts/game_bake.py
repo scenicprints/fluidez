@@ -94,6 +94,29 @@ PLACE = {
     'guadalupe-08': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', -3, 9, None),
     'guadalupe-09': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', 9, 13, None),
     'guadalupe-10': (u'Iglesia de Nuestra Se\xf1ora de Guadalupe', -10, 12, None),
+    # Pantanal, down towards the water. The fisherman stands at the lakefront
+    # with his lancha; the rest are in the barrio behind it.
+    'pantanal-01': (u'Centro Turistico', 6, 4, 'lancha'),
+    'pantanal-02': (u'Reparto Germ\xe1n Pomares', -6, 4, None),
+    'pantanal-03': (u'Reparto Germ\xe1n Pomares', 7, -5, None),
+    'pantanal-04': (u'Reparto Germ\xe1n Pomares', -9, -3, None),
+    'pantanal-05': (u'Reparto Germ\xe1n Pomares', 3, 8, None),
+    'pantanal-06': (u'Carlos M. Marenco', -5, 6, None),
+    'pantanal-07': (u'Carlos M. Marenco', 8, -4, None),
+    'pantanal-08': (u'Carlos M. Marenco', -8, -6, None),
+    'pantanal-09': (u'Reparto Germ\xe1n Pomares', 11, 7, None),
+    'pantanal-10': (u'Carlos M. Marenco', 4, 10, None),
+    # La Terminal. Six of these happen at a vehicle, which is the point of it.
+    'terminal-01': (u'Terminal de buses Granada - Managua (UCA)', -4, 5, 'bus'),
+    'terminal-02': (u'Transnica & King Quality', 6, 5, 'taxi'),
+    'terminal-03': (u'Transnica & King Quality', -6, 7, 'taxi'),
+    'terminal-04': (u'Transnica & King Quality', 2, -6, None),
+    'terminal-05': (u'Terminal de buses Granada - Managua (UCA)', 6, -4, 'bus'),
+    'terminal-06': (u'Transnica & King Quality', -9, -3, None),
+    'terminal-07': (u'Transnica & King Quality', 9, -7, None),
+    'terminal-08': (u'Terminal de buses Granada - Managua (UCA)', -8, -6, None),
+    'terminal-09': (u'Transnica & King Quality', 11, 2, 'bus'),
+    'terminal-10': (u'Terminal de buses Granada - Managua (UCA)', 3, 9, None),
 }
 
 # Skin and shirt, drawn deterministically from the id so a face never changes

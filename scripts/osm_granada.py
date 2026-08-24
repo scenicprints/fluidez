@@ -665,7 +665,16 @@ WANTED = {
     u'Hospital Granada': 'tramites', u'Hospital Jap\xf3n-Nicaragua': 'tramites',
     u'Parroquia Nuestra Se\xf1ora del Socorro': 'fiestas',
     u'Iglesia Vieja Ermita El Socorro': 'fiestas',
-    u'Parque Otra Banda': 'barrio', u'Barrio Posintepe': 'pantanal',
+    u'Parque Otra Banda': 'barrio',
+    # Pantanal is the lakeside quarter between La Calzada and the water. OSM
+    # does not carry the name, so these are the two neighbourhoods that are
+    # actually down there, and the Centro Turístico is the lakefront itself.
+    u'Reparto Germ\xe1n Pomares': 'pantanal',
+    u'Carlos M. Marenco': 'pantanal',
+    u'Centro Turistico': 'malecon',
+    # Granada has two bus terminals: the international one by the old station
+    # and this one, which is where you actually get a bus to Managua.
+    u'Terminal de buses Granada - Managua (UCA)': 'terminal',
     u'Isla El Castillo': 'afuera', u'Isla de los Monos': 'afuera',
 }
 
