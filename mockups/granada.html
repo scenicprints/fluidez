@@ -125,7 +125,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 .help.hint .give { font-family: var(--sans); font-size: 15px; letter-spacing: 0; color: var(--txt); }
 
 .peek {
-  display: block; width: 100%; background: none; border: 0; color: var(--txt3);
+  display: block; background: none; border: 0; color: var(--txt3);
   font: inherit; font-size: 12px; cursor: pointer; padding: 2px 0 12px; text-align: left;
   text-decoration: underline; text-underline-offset: 3px;
 }
@@ -139,15 +139,27 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
   letter-spacing: .08em; text-transform: uppercase; margin-top: 3px;
 }
 
-.answer { display: flex; gap: 8px; }
-.answer input {
-  flex: 1; min-width: 0; background: var(--ceniza2); border: 1px solid var(--linea);
-  border-radius: 12px; padding: 12px 13px; color: var(--papel); font-family: var(--serif); font-size: 17px;
+.built {
+  min-height: 52px; border-bottom: 2px solid var(--linea); padding: 6px 2px 10px;
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; margin-bottom: 12px;
 }
-.answer input::placeholder { font-family: var(--sans); font-size: 13.5px; color: var(--txt3); }
-.answer input:focus { outline: none; border-color: var(--oro); }
+.ghost { font-size: 13px; color: var(--txt3); padding: 8px 2px; }
+.tray { display: flex; flex-wrap: wrap; gap: 7px; min-height: 40px; }
+.tile {
+  font-family: var(--serif); font-size: 17px; line-height: 1;
+  background: var(--ceniza2); color: var(--papel);
+  border: 1px solid var(--linea); border-bottom-width: 3px;
+  border-radius: 10px; padding: 10px 12px; cursor: pointer;
+}
+.tile:active { transform: translateY(1px); border-bottom-width: 2px; }
+.tile:focus-visible { outline: 2px solid var(--oro); outline-offset: 2px; }
+.tile.placed { background: rgba(232,163,61,.12); border-color: var(--oro-d); }
+
+.row { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.row .peek { flex: 1; padding: 0; }
 .go { flex: none; border: 0; border-radius: 12px; padding: 0 17px; cursor: pointer; font: inherit; font-weight: 700; font-size: 13.5px;
   background: linear-gradient(96deg, var(--oro), #D08A22); color: #221605; }
+.go[disabled] { opacity: .4; cursor: default; }
 .go.jade { background: linear-gradient(96deg, var(--jade), #279B82); color: #06251E; width: 100%; padding: 13px; margin-top: 12px; }
 .go:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 
@@ -214,10 +226,10 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 
 <section class="legend">
   <h2>What to watch for</h2>
-  <div><b>1</b><span>The hostel gives you every line to copy. By the taxi,
-    <em>por favor</em> is gone from the screen — you type it or you don't.</span></div>
-  <div><b>2</b><span>Miss twice and options appear. Never stuck, and nothing is
-    locked behind homework.</span></div>
+  <div><b>1</b><span>You build every answer from chunks, so nothing you can say
+    is correct-but-refused. The tray gets noisier as a phrase sticks.</span></div>
+  <div><b>2</b><span>Miss twice and it lays the right answer out for you. Never
+    stuck, and nothing is locked behind homework.</span></div>
   <div><b class="j">3</b><span>Words you use go into the same vocabulary the app
     already tracks. Gold is growing, jade is locked in.</span></div>
 </section>
@@ -319,8 +331,8 @@ const NPCS = [
       { es:'Buenas. ¿En qué le ayudo?', objective:'Ask for a room', key:'buenas',
         say:'Buenas. Quiero un cuarto.', en:'Hello. I want a room.',
         bank:[['Buenas','hello'],['quiero','I want'],['un cuarto','a room']],
-        ok:['buenas quiero un cuarto','quiero un cuarto','quiero un cuarto por favor',
-            'buenas quiero un cuarto por favor','quiero una habitacion','buenas quiero una habitacion'],
+        tiles:['Buenas','quiero','un cuarto'], extra:['mañana','no','gracias','tres'],
+        ok:['buenas quiero un cuarto','quiero un cuarto','buenas quiero un cuarto gracias','quiero un cuarto gracias'],
         teaches:['buenas','querer','cuarto'],
         good:'Cuarto, not habitación. Habitación is what a Spaniard says.',
         decoys:[{es:'¿Dónde está el baño?',en:'Where is the bathroom?'},
@@ -328,14 +340,16 @@ const NPCS = [
       { es:'¿Para cuántas noches?', objective:'Three nights', key:'tres noches',
         say:'Tres noches.', en:'Three nights.',
         bank:[['tres','three'],['noches','nights']],
-        ok:['tres noches','tres','por tres noches','para tres noches','son tres noches'],
+        tiles:['tres','noches'], extra:['córdobas','cinco','un cuarto','mañana'],
+        ok:['tres noches','tres'],
         teaches:['tres','noche'],
         good:'Short is normal. Nobody builds a sentence for this.',
         decoys:[{es:'Tres córdobas.',en:'Three córdobas.'},{es:'A las tres.',en:'At three o’clock.'}] },
       { es:'Son quince dólares la noche. ¿Está bien?', objective:'Agree', key:'esta bien',
         say:'Está bien.', en:'That’s fine.',
         bank:[['está','it is'],['bien','well, fine']],
-        ok:['esta bien','si esta bien','si','esta bien gracias','si esta bien gracias','muy bien'],
+        tiles:['está','bien'], extra:['no','muy','caro','gracias'],
+        ok:['esta bien','esta bien gracias','muy bien'],
         teaches:['estar','bien','quince'],
         good:'Está bien is the whole language for yes, agreed, fine, alright.',
         decoys:[{es:'Está bueno.',en:'It tastes good.'},{es:'No hay.',en:'There is none.'}] }
@@ -348,22 +362,24 @@ const NPCS = [
       { es:'Buenas, ¿qué le doy?', objective:'Order gallo pinto', key:'por favor',
         say:'Buenas. Un gallo pinto, por favor.', en:'Hello. A gallo pinto, please.',
         bank:[['Buenas','hello'],['un gallo pinto','rice and beans'],['por favor','please']],
-        ok:['buenas un gallo pinto por favor','un gallo pinto por favor','gallo pinto por favor',
-            'un gallo pinto','gallo pinto','quiero un gallo pinto','buenas un gallo pinto'],
+        tiles:['Buenas','un gallo pinto','por favor'], extra:['un café','no','la cuenta','mañana'],
+        ok:['buenas un gallo pinto por favor','un gallo pinto por favor','buenas un gallo pinto','un gallo pinto'],
         teaches:['gallo pinto','por favor'],
         good:'Rice and beans fried together. Breakfast, and there is no other option.',
         decoys:[{es:'Un gallo, por favor.',en:'A rooster, please.'},{es:'Quiero comer.',en:'I want to eat.'}] },
       { es:'¿Y de tomar?', objective:'A coffee', key:'por favor',
         say:'Un café, por favor.', en:'A coffee, please.',
         bank:[['un café','a coffee'],['por favor','please']],
-        ok:['un cafe por favor','cafe por favor','un cafe','cafe','un cafe negro por favor','cafe negro'],
+        tiles:['un café','por favor'], extra:['un gallo pinto','agua','no','buenas'],
+        ok:['un cafe por favor','un cafe','buenas un cafe por favor'],
         teaches:['café','tomar'],
         good:'De tomar covers anything you drink, not just alcohol.',
         decoys:[{es:'Nada, gracias.',en:'Nothing, thanks.'},{es:'Agua, por favor.',en:'Water, please.'}] },
       { es:'Ahí le va, pues.', objective:'Ask what you owe', key:'cuanto le debo',
         say:'¿Cuánto le debo?', en:'How much do I owe you?',
         bank:[['cuánto','how much'],['le debo','I owe you']],
-        ok:['cuanto le debo','cuanto es','la cuenta por favor','cuanto vale','cuanto cuesta','cuanto le debo por favor'],
+        tiles:['cuánto','le debo'], extra:['la cuenta','por favor','está bien','gracias'],
+        ok:['cuanto le debo','cuanto le debo por favor','la cuenta por favor','la cuenta'],
         teaches:['cuánto','deber'],
         good:'¿Cuánto le debo? is warmer than la cuenta. It assumes you are staying.',
         decoys:[{es:'¿Cuánto tiempo?',en:'How long?'},{es:'Está muy rico.',en:'It is delicious.'}] }
@@ -376,21 +392,24 @@ const NPCS = [
       { es:'¿Para dónde vamos?', objective:'The market', key:'por favor',
         say:'Al mercado, por favor.', en:'To the market, please.',
         bank:[['al mercado','to the market'],['por favor','please']],
-        ok:['al mercado por favor','al mercado','mercado','al mercado municipal','quiero ir al mercado','voy al mercado'],
+        tiles:['al mercado','por favor'], extra:['al parque','no sé','cien','buenas'],
+        ok:['al mercado por favor','al mercado'],
         teaches:['mercado','ir'],
         good:'Al mercado. Nobody in Granada uses a street name for anything.',
         decoys:[{es:'Al parque, por favor.',en:'To the park, please.'},{es:'No sé.',en:'I don’t know.'}] },
       { es:'Cien córdobas.', objective:'That is the chele price — offer eighty', key:'ochenta',
         say:'¿Ochenta?', en:'Eighty?',
         bank:[['ochenta','eighty']],
-        ok:['ochenta','ochenta cordobas','le doy ochenta','ochenta y ya','que sean ochenta','ochenta va'],
+        tiles:['ochenta'], extra:['cien','córdobas','muy caro','está bien'],
+        ok:['ochenta','ochenta cordobas'],
         teaches:['ochenta','córdoba'],
         good:'One word, said like a question. Haggling here is not an argument.',
         decoys:[{es:'Es muy caro.',en:'That is very expensive.'},{es:'Está bien.',en:'Fine.'}] },
       { es:'Ochenta y cinco y nos vamos.', objective:'Take it', key:'esta bien',
         say:'Está bien.', en:'Alright.',
         bank:[['está','it is'],['bien','fine']],
-        ok:['esta bien','si esta bien','esta bien vamos','vamos','si vamos','dale','si'],
+        tiles:['está','bien'], extra:['no','ochenta','muy','caro'],
+        ok:['esta bien'],
         teaches:['bien'],
         good:'You met him in the middle. That is the entire ritual.',
         decoys:[{es:'Ochenta.',en:'Eighty.'},{es:'No, gracias.',en:'No, thank you.'}] }
@@ -622,18 +641,15 @@ $('abtn').addEventListener('click', tryTalk);
 const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/[¿?¡!.,;:"'()]/g, ' ').replace(/\s+/g, ' ').trim();
 
-function accepted(typed, beat) {
-  const t = norm(typed);
-  if (!t) return false;
-  if (beat.ok.some((a) => norm(a) === t)) return true;
-  return beat.ok.some((a) => {
-    const want = norm(a).split(' ').filter((w) => w.length > 2);
-    if (!want.length) return false;
-    let i = 0;
-    for (const w of t.split(' ')) if (w === want[i]) i++;
-    return i === want.length;
-  });
+// You build the answer from chunks, so the set of sentences you can produce is
+// finite and authored. That means an EXACT match is the whole grader: nothing
+// you can assemble is correct-but-refused, which is the failure a typed answer
+// could never rule out.
+function accepted(sentence, beat) {
+  const t = norm(sentence);
+  return !!t && beat.ok.some((a) => norm(a) === t);
 }
+const shuffled = (xs) => xs.slice().sort(() => Math.random() - 0.5);
 // No speech. The only voice available is es-MX and it reads Nicaraguan
 // Spanish in a Mexican accent, which teaches the wrong thing. This game is
 // read-only by decision.
@@ -672,24 +688,16 @@ const hintOf = (s) => s.replace(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/g, (w) =>
 
 function renderBeat() {
   const n = S.npc, beat = n.beats[S.beat], lvl = S.seen[beat.key] || 0;
-  // You are never handed the finished sentence. The first time you meet a
-  // phrase you get its INGREDIENTS, shuffled, and you put them together
-  // yourself — which you can do knowing no Spanish at all, and which is a
-  // real attempt rather than copying a line off the screen.
-  let help;
-  if (lvl === 0) {
-    const bank = (beat.bank || []).slice().sort(() => Math.random() - 0.5);
-    help = `<div class="help"><div class="lab">New — build it from these</div>
-      <div class="bank">${bank.map(([es, en]) =>
-        `<span class="ing"><b class="es">${es}</b><i>${en}</i></span>`).join('')}</div>
-      <div class="en">You are saying: “${beat.en}”</div></div>`;
-  } else if (lvl === 1) {
-    help = `<div class="help hint"><div class="lab">You have had this once</div>
-      <div class="give">“${beat.en}”</div></div>`;
-  } else {
-    help = `<div class="help cold"><div class="lab">On your own</div></div>`;
-  }
-  help += `<button class="peek" id="peek" type="button">I am stuck — show me the line</button>`;
+  S.built = [];
+  // The ladder is now how much noise is in the tray and whether you are told
+  // what you are trying to say. The chunks themselves are always there - you
+  // are never stuck, and you are never handed the finished sentence either.
+  const noise = lvl === 0 ? 1 : lvl === 1 ? 2 : 4;
+  S.tray = shuffled(beat.tiles.concat((beat.extra || []).slice(0, noise)))
+    .map((text, i) => ({ text, id: i }));
+
+  const label = lvl === 0 ? 'Build it' : lvl === 1 ? 'You have had this once' : 'On your own';
+  const gloss = lvl < 2 ? `<div class="en">You are saying: “${beat.en}”</div>` : '';
 
   $('panel').innerHTML =
     `<div style="display:flex;gap:10px;align-items:flex-start">
@@ -699,47 +707,72 @@ function renderBeat() {
          <div class="says-es">${beat.es}</div>
          <div class="objective">${beat.objective}</div>
        </div>
-     </div>` +
-    help +
-    `<div class="answer">
-       <input id="typed" type="text" autocomplete="off" autocorrect="off" spellcheck="false"
-              placeholder="Type your answer in Spanish…" aria-label="Your answer in Spanish">
-       <button class="go" id="send" type="button">Say it</button>
-     </div><div id="after"></div>`;
+     </div>
+     <div class="help${lvl === 2 ? ' cold' : lvl === 1 ? ' hint' : ''}">
+       <div class="lab">${label}</div>${gloss}
+     </div>
+     <div class="built" id="built"></div>
+     <div class="tray" id="tray"></div>
+     <div class="row">
+       <button class="peek" id="peek" type="button">I am stuck — show me the line</button>
+       <button class="go" id="send" type="button" disabled>Say it</button>
+     </div>
+     <div id="after"></div>`;
+
+  paintTiles();
   $('send').addEventListener('click', submit);
   $('peek').addEventListener('click', () => {
-    S.peeked = true;
-    $('peek').outerHTML = `<div class="peeked es">${beat.say}<span>you asked for this one</span></div>`;
+    $('peek').outerHTML = `<div class="peeked es">${beat.say}</div>`;
   });
-  const inp = $('typed');
-  inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') submit(); });
-  setTimeout(() => inp.focus(), 50);
 }
+
+function paintTiles() {
+  const built = $('built'), tray = $('tray');
+  if (!built) return;
+  built.innerHTML = S.built.length
+    ? S.built.map((t) => `<button class="tile placed es" type="button" data-id="${t.id}">${t.text}</button>`).join('')
+    : '<span class="ghost">Tap the chunks below to build your answer</span>';
+  tray.innerHTML = S.tray
+    .filter((t) => !S.built.some((b) => b.id === t.id))
+    .map((t) => `<button class="tile es" type="button" data-id="${t.id}">${t.text}</button>`).join('');
+
+  built.querySelectorAll('.tile').forEach((b) => b.addEventListener('click', () => {
+    S.built = S.built.filter((t) => t.id !== Number(b.dataset.id));
+    paintTiles();
+  }));
+  tray.querySelectorAll('.tile').forEach((b) => b.addEventListener('click', () => {
+    const t = S.tray.find((x) => x.id === Number(b.dataset.id));
+    if (t) S.built.push(t);
+    paintTiles();
+  }));
+  const send = $('send');
+  if (send) send.disabled = S.built.length === 0;
+}
+
+function sentence() { return S.built.map((t) => t.text).join(' '); }
+
 function submit() {
-  const beat = S.npc.beats[S.beat], inp = $('typed');
-  if (!inp.value.trim()) return;
-  if (accepted(inp.value, beat)) return land(beat);
+  const beat = S.npc.beats[S.beat];
+  if (!S.built.length) return;
+  if (accepted(sentence(), beat)) return land(beat);
   S.misses++;
   const after = $('after');
   if (S.misses < 2) {
-    after.innerHTML = `<div class="fb bad"><b>${MOMO_BAD[0]} not quite</b>Try again — or say less. Short answers are normal here.</div>`;
-    inp.select(); return;
+    after.innerHTML = `<div class="fb bad"><b>${MOMO_BAD[0]} not quite</b>Read it back to yourself. Tap a chunk to take it out again.</div>`;
+    return;
   }
-  const opts = [{ ...beat, right: true, es: beat.say, en: beat.en }, ...beat.decoys].sort(() => Math.random() - 0.5);
-  after.innerHTML = `<div class="fb bad"><b>Here are three</b>Tap the one that fits.</div>
-    <div class="opts">${opts.map((o) =>
-      `<button class="opt" type="button" data-right="${!!o.right}">
-        <span class="s es">${o.es}</span><span class="e">${o.en}</span></button>`).join('')}</div>`;
-  after.querySelectorAll('.opt').forEach((b) => b.addEventListener('click', () => {
-    if (b.dataset.right === 'true') land(beat);
-    else b.style.borderColor = 'var(--barro-d)';
-  }));
+  // Never stuck: lay the right answer out and let them see the shape of it.
+  S.built = beat.tiles.map((text) => S.tray.find((t) => t.text === text)).filter(Boolean);
+  paintTiles();
+  after.innerHTML = `<div class="fb bad"><b>Here it is</b>This is the one. Send it and keep going.</div>`;
 }
+
 function land(beat) {
   S.seen[beat.key] = (S.seen[beat.key] || 0) + 1;
   beat.teaches.forEach((w) => { S.words[w] = (S.words[w] || 0) + 1; });
   $('wCount').textContent = Object.keys(S.words).length;
-  $('typed').disabled = true; $('send').disabled = true;
+  $('send').disabled = true;
+  $('tray').innerHTML = '';
   $('after').innerHTML =
     `<div class="fb good"><b>${MOMO_GOOD[Math.floor(Math.random()*MOMO_GOOD.length)]} that works</b>${beat.good}</div>
      <div class="chips">${beat.teaches.map((w) =>

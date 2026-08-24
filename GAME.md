@@ -55,8 +55,18 @@ attempt it with no prior Spanish, but they have to **assemble** it, which is
 the actual skill. There is always an "I am stuck — show me the line" link, so
 the finished sentence is a choice you make rather than the default state.
 
-**You type your answer.** Not multiple choice — the app is already full of
-that, and recognising a sentence is not producing one.
+**You BUILD the answer from chunks. You do not type it.** Typing was tried and
+Kevin killed it: *"We cant be doing typed answers. Because you have to type
+exactly how it is programmed. And the user may type something, and technically
+it is correct, but the program does know."* That is the real failure of free
+text and no amount of fuzzy matching closes it — a learner who is right and
+gets marked wrong stops playing.
+
+So the answer is assembled from a tray of chunks: `Buenas` `quiero`
+`un cuarto` `mañana`. Tap to place, tap again to take back. This is **not**
+multiple choice — you are not picking one of three finished sentences, you are
+composing one, which is the skill. It also means accents cost nothing and there
+is no phone keyboard to fight.
 
 **No speech recognition, and NO SPEECH AT ALL.** Two separate calls:
 - Recognition was never on the table. `docs/js/speech.js` already says why:
@@ -94,40 +104,35 @@ there will answer a chele in English is not a problem — it is a mission.
 
 ## How answers are graded
 
-Kevin asked: *"How many answers are acceptable for a question?"*
+**Exact match, and that is the whole grader.** Because the tray is authored,
+the set of sentences a player can produce is finite and known, so every correct
+assembly can simply be listed. Nothing a player can build is
+correct-but-refused. That is the entire reason for the chunk tray.
 
-In the mockup it is **six on average** (5–7), 55 authored strings across 9
-beats. But the authored list is only one of three layers, and the other two do
-most of the work:
+The comparison still normalises first — lowercase, accents stripped,
+punctuation stripped — so the `ok` lists can be written in plain ASCII.
 
-1. **Normalisation.** Before anything is compared: lowercase, strip accents,
-   strip `¿ ? ¡ ! . , ; : " '`, collapse whitespace. So `¿Cuánto le debo?`,
-   `cuanto le debo` and `Cuanto Le Debo` are all the same string. Typing
-   without accents always works — which matters, because nobody wants to hunt
-   for `á` on a phone keyboard mid-sentence.
-2. **The authored list.** Genuinely different ways to say it:
-   `un gallo pinto por favor` / `gallo pinto por favor` / `quiero un gallo
-   pinto` / `buenas un gallo pinto`.
-3. **The subsequence rule.** If the content words (>2 letters) of any accepted
-   answer appear **in order** in what you typed, it passes. So *"buenas, quiero
-   un gallo pinto por favor señora"* passes against *"quiero un gallo pinto"*.
-   This is the layer that stops the "I said it right and it marked me wrong"
-   rage, which is the one thing that would kill a typed game.
+Two invariants, both checked by `mockups/checkbeats.py`, and both worth
+re-running whenever a beat is written or edited:
 
-**This does not scale, and should change before we write 150 beats.** The
-subsequence rule is loose — it will currently accept *"no quiero un cuarto"*
-for *"quiero un cuarto"*, because it ignores the extra word. The fix is to stop
-authoring whole sentences and author a **rule** per beat instead:
+1. The tiles laid down **in their written order** must be one of the accepted
+   answers, or the beat is unwinnable.
+2. Every accepted answer must be **buildable from the chunks the tray offers**,
+   or it is dead data pretending to be a second right answer.
 
-```js
-{ needs: [['cuarto','habitación'], ['quiero','quisiera','ocupo','me da']],
-  forbids: ['no', 'nunca'],
-  maxExtra: 3 }
-```
+Each beat carries `tiles` (the chunks that build the answer), `extra` (chunks
+that do not), and `ok` (every assembly that counts). The **help ladder is now
+noise**, not the answer:
 
-Three lines instead of seven sentences, accepts far more, and it can say *why*
-it rejected something ("you asked for it in the negative"). Recommend switching
-to this before the content push.
+| times you have met the phrase | tray | told what you are saying? |
+|---|---|---|
+| 0 | tiles + 1 distractor | yes |
+| 1 | tiles + 2 distractors | yes |
+| 2+ | tiles + 4 distractors | no |
+
+Miss twice and it lays the right answer out in the tray for you, so a beat can
+never dead-end. There is also an always-available "I am stuck — show me the
+line".
 
 ---
 
