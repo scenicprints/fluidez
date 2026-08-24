@@ -141,6 +141,73 @@ for (const n of P.NPCS) {
   check(d < 4000, `${n.id} is not on the other side of the city`, `${d | 0}px`);
 }
 
+// ── 3b. you can actually get to all of them ──────────────────────────────
+// walkable() will happily put somebody in the middle of a block, which is a
+// tile you could stand on and a tile you can never reach: the yards in this
+// city are enclosed by the houses around them. So flood the walkable city
+// from where the player starts and make sure everybody is inside it.
+{
+  const seenT = new Uint8Array(P.W * P.H);
+  const stack = [((P.S.py / 16) | 0) * P.W + ((P.S.px / 16) | 0)];
+  seenT[stack[0]] = 1;
+  let reached = 0;
+  while (stack.length) {
+    const i = stack.pop(); reached++;
+    const x = i % P.W, y = (i / P.W) | 0;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= P.W || ny >= P.H) continue;
+      const j = ny * P.W + nx;
+      if (seenT[j] || P.SOLID.has(P.grid[j])) continue;
+      seenT[j] = 1; stack.push(j);
+    }
+  }
+  check(reached > 100000, 'the city you can walk is a city, not a courtyard',
+        `${reached} tiles reachable`);
+  for (const n of P.NPCS) {
+    check(seenT[n.y * P.W + n.x] === 1,
+          `you can walk to ${n.id}`, `${n.name} at ${n.x},${n.y} is walled in`);
+  }
+}
+
+// ── 3c. the missions survived being baked in ─────────────────────────────
+const norm = (t) => (t || '').toLowerCase().normalize('NFD')
+  .replace(/[̀-ͯ]/g, '').replace(/[¿?¡!.,;:"'«»]/g, ' ')
+  .replace(/\s+/g, ' ').trim();
+{
+  const missions = P.NPCS.filter((n) => !n.crowd);
+  check(missions.length >= 12, 'the written missions are in the mockup',
+        `${missions.length}`);
+  const seatOf = new Map();
+  for (const n of P.NPCS) {
+    const k = n.x + ',' + n.y;
+    check(!seatOf.has(k), `${n.id} is not standing on top of somebody`,
+          `${seatOf.get(k)} is already at ${k}`);
+    seatOf.set(k, n.id);
+  }
+  for (const m of missions) {
+    check(m.beats.length > 0, `${m.id} has beats`);
+    check(!!m.done && !!m.quest, `${m.id} has a goal and an ending`);
+    // the crowd has to point at it or nobody will find it
+    const pointed = P.NPCS.some((n) => n.crowd && (n.points_at || []).includes(m.id));
+    check(pointed, `somebody in the street points at ${m.id}`);
+    for (let i = 0; i < m.beats.length; i++) {
+      const b = m.beats[i], where = `${m.id} beat ${i + 1}`;
+      const ok = new Set(b.ok.map(norm));
+      check(ok.has(norm(b.tiles.join(' '))), `${where} can be won`,
+            `"${norm(b.tiles.join(' '))}" is not accepted`);
+      const pool = new Set(norm(b.tiles.concat(b.extra || []).join(' ')).split(' '));
+      for (const a of b.ok)
+        check(norm(a).split(' ').every((w) => pool.has(w)),
+              `${where} only accepts what the tray can build`, `"${a}"`);
+      // the give-up path finds each chunk in the tray by its text
+      const texts = b.tiles.concat(b.extra || []);
+      check(new Set(texts).size === texts.length,
+            `${where} has no chunk twice in its tray`, texts.join(' | '));
+    }
+  }
+}
+
 // ── 4. the street graph joins up ─────────────────────────────────────────
 let dead = 0, orphan = 0;
 for (const e of P.MAP.edges) {
@@ -194,7 +261,10 @@ for (let f = 0; f < 1500 && !honks; f++) {
   // park the player on top of whichever vehicle is nearest, in its way
   const v = P.TRAFFIC.find((x) => x.x !== undefined);
   if (!v) break;
-  P.S.px = v.x + Math.cos(v.ang) * 12; P.S.py = v.y + Math.sin(v.ang) * 12;
+  // stand exactly where that vehicle looks for an obstruction -- a bus looks
+  // much further ahead than a bici, so a fixed distance made this flaky
+  const ahead = 10 + v.kind.l * 0.6;
+  P.S.px = v.x + Math.cos(v.ang) * ahead; P.S.py = v.y + Math.sin(v.ang) * ahead;
   P.traffic(16);
   if (v.stopped > 0) braked++;
   if (v.honk > 0) honks++;
