@@ -166,32 +166,51 @@ line".
 
 ---
 
-## What is left
+## What is left, in order
 
-**The mockup was never driven end to end.** It renders, the loop runs (the
-markers bob), and the code has been read line by line — but no keypress or
-click could be delivered into it. The artifact iframe is cross-origin and
-refuses scripted input; the in-app browser pane will not run a live local page
-either. **First job for whoever picks this up: play it and confirm the d-pad
-moves you and the A button opens a conversation.**
+**1. Write the rest of El Centro** — eight missions, `centro-04` and
+`centro-06` through `centro-12`. This is the immediate job.
 
-Known rough edges in the mockup:
-- Roofs are still a big field of terracotta. Buildings are 2–3 tiles wide;
-  widening them to 3–5 with bigger patios would break it up.
-- No street life. People wandering, a dog, washing on a line.
-- The `!` bubble is good; the "done" bubble could read better.
+Copy `.github/scripts/game_write_centro.py` in the content repo and edit it.
+Emit a whole batch from one throwaway Python file; never one tool call per
+mission. Every beat needs `es` (what they say), `objective`, `key` (the phrase
+the help ladder counts), `say` (the target), `en`, `tiles`, `extra`, `ok`,
+`teaches` and `good` (why the right answer is right). Every mission needs a
+`culture` note. Then add crowd lines in `content/game/crowd/<district>.json`
+pointing at each new mission, or `game_stage.py` will fail them as unfindable.
 
-Then, in order:
-1. **Scope decision.** Three missions in one district is a demo. A real Granada
-   is a dozen locations and ~40 missions. Kevin has already been told that, and
-   that it is the 185-story job again — he chose **all hand-written**
-   encounters, so the writing is the cost, not the code.
-2. **Switch grading to the rule shape above** before writing content.
-3. **Where the content lives.** Encounters are Nicaraguan Spanish gated on
-   vocabulary, so they belong in `scenicprints/fluidez-es-ni` under `content/`
-   and ship with no app release. Old clients ignore an unknown manifest key —
-   that is how `momo.json` shipped. Push content FIRST, then the app.
-4. **The engine and the map go here**, in `docs/js/`, as a new screen.
+Then `python .github/scripts/game_stage.py --root .`, fix what it reports,
+commit only when it prints no `PROBLEM:` lines, and `git pull --rebase` before
+pushing.
+
+**2. Then El Mercado**, then work outward. Twelve districts, 122 missions.
+
+**3. The app screen** — the canvas world, the chunk tray, and swapping Scenes
+out of `TAB_DEFS`. This is the only part that needs an app release. Do it once
+enough content exists to be worth playing, not before.
+
+**4. The wiring that justifies all of it.** `teaches` on every beat must
+resolve to real dictionary lemmas, so playing feeds the same vocabulary the
+reader and the drills feed. Order a coffee in Granada and `café` gets stronger
+in Words; neglect it and it fades. Without that link this is a nice separate
+game. With it, it is a way into the course.
+
+### The mockup
+
+`mockups/granada.html` — one self-contained file, no build. Published at
+https://claude.ai/code/artifact/52e5240b-857b-4ad1-853b-b6cc1e0040fa
+
+**Kevin has played it and it works** — walking, talking, and the chunk tray.
+Note that neither browser tool available here can deliver a keypress or a click
+into a sandboxed artifact iframe, and the in-app pane will not run a live local
+page, so you cannot drive it yourself. Verify by reading and let Kevin play.
+
+`mockups/checkbeats.py` checks the beats **inside the mockup file**;
+`game_stage.py` checks the real content. They are not the same script.
+
+Rough edges Kevin has not complained about, so do not spend time here yet:
+roofs are a big field of terracotta (buildings are 2–3 tiles wide), and there
+is no street life — nobody wandering, no dog, no washing on a line.
 
 ---
 
