@@ -31,3 +31,52 @@ is almost never.
     node docs/js/engine.test.mjs
 
 CI runs this on every push; a broken engine never reaches Pages.
+
+## Adding a language
+
+Four things are per-course and all four come out of the content pack, so a new
+language is a content repo plus a line in the registry. Only artwork needs an
+app release.
+
+| What | Where it lives | Fallback if the pack says nothing |
+|---|---|---|
+| Phase ladder | `pack.phases` | the original eight |
+| Interface labels | `pack.ui` | English (`EN` in `js/ui.js`) |
+| Tab icons | `pack.icons`, e.g. `{"path": "ic-gondola"}` | the default sprite |
+| Mascot | `pack.mascot`, an id from `js/creatures.js` | mapped by language code, else Momo |
+| Palette | `[data-course="<code>"]` in `css/app.css` | the shipping one |
+
+`data-course` is stamped onto `<html>` when the pack loads, which is what lets
+the stylesheet repaint the whole app without any screen knowing the language.
+
+**The one rule for a new palette.** Colour means memory strength and never
+decoration, so `--jade`, `--oro` and `--barro` are **the same in every course**:
+a locked-in word looks identical whatever you are learning. Repaint `--accent`,
+`--chrome-grad`, the grounds and the text instead. `--accent` is deliberately
+separate from `--oro` — before the split they were one token doing both jobs,
+and no second course could look different without changing what a colour meant.
+
+**A course with no lessons yet** shows its tiles but routes all of them to the
+`Im Bau` screen. That is `underConstruction()` in `js/content.js`, which is
+`content.lessons.length === 0`, so it switches itself off when content lands.
+
+### Mascots
+
+`js/creatures.js` holds one entry per animal. Each exposes the same rig, so
+`js/mascot.js` drives behaviour without knowing the species:
+
+    .m-float  whole body     .m-head   turns and tilts
+    .m-limbL  wing/paw/ear   .m-limbR  the other one
+    .m-tail   the idle loop  .m-mouth  beak/muzzle
+    .lid      eyelids        .m-glow   the good-answer halo
+    .zzz      sleep marks
+
+`beats` names the idle animations that animal actually does, and `leave` /
+`arrive` name how it gets off screen and back. SVG ids **must** be suffixed per
+instance: the mascot is on screen more than once, and shared ids resolved into
+the hidden splash copy and silently painted every gradient shape as nothing.
+
+    node docs/js/creatures.test.mjs
+
+CI runs it. A broken rig paints nothing and throws nothing, so it has to be
+asserted rather than looked at.
