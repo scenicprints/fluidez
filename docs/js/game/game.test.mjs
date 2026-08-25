@@ -42,16 +42,22 @@ const makeEl = (id) => {
     id, width: 0, height: 0, textContent: '', innerHTML: '', style: {},
     dataset: {}, disabled: false,
     classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
-    getBoundingClientRect: () => ({ width: 390, height: 560 }),
+    // left/top matter: the stick works out its centre from this, and without
+    // them every pointer position came out NaN and the knob never moved.
+    getBoundingClientRect: () => (id === 'gameStick'
+      ? { left: 20, top: 600, width: 132, height: 132, right: 152, bottom: 732 }
+      : { left: 0, top: 0, width: 390, height: 560, right: 390, bottom: 560 }),
     getContext: () => ctx2d(),
     addEventListener: (ev, fn) => { (listeners[ev] || (listeners[ev] = [])).push(fn); },
     querySelectorAll: () => [],
     appendChild() {}, removeChild() {}, focus() {},
-    fire: (ev) => {
+    fire: (ev, extra) => {
       let prevented = false;
-      (listeners[ev] || []).forEach((f) => f({ preventDefault() { prevented = true; } }));
+      const e = { preventDefault() { prevented = true; }, ...(extra || {}) };
+      (listeners[ev] || []).forEach((f) => f(e));
       return prevented;
     },
+    setPointerCapture() {}, releasePointerCapture() {},
     listenerCount: (ev) => (listeners[ev] || []).length,
     get firstChild() { return null; },
   };
@@ -212,18 +218,51 @@ test('a thousand frames of traffic stays on the road', () => {
   assert.ok(offroad < 40, `${offroad} vehicle-frames off the road`);
 });
 
+const PUSH = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 },
+               left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+
 test('walls stop you, from anywhere you can legitimately stand', () => {
   // Start where the player really starts and walk hard in each direction for
   // a few seconds. Wherever you end up must be somewhere you could stand.
   const start = world.spot('Parque Central');
-  for (const dir of ['up', 'down', 'left', 'right']) {
-    const w = world.walkableStart || { x: start.x, y: start.y + 9 };
-    world.S.px = w.x * TS + 8; world.S.py = w.y * TS + 8;
-    for (let i = 0; i < 200; i++) world.move(16, { [dir]: true });
+  for (const dir of Object.keys(PUSH)) {
+    world.S.px = start.x * TS + 8; world.S.py = (start.y + 9) * TS + 8;
+    for (let i = 0; i < 200; i++) world.move(16, PUSH[dir]);
     const tile = world.at(Math.floor(world.S.px / TS), Math.floor(world.S.py / TS));
-    assert.ok(!SOLID.has(tile),
-      `walking ${dir} ended on a solid tile (${tile})`);
+    assert.ok(!SOLID.has(tile), `walking ${dir} ended on a solid tile (${tile})`);
   }
+});
+
+test('the stick is analog — half a push walks half as far', () => {
+  // Somewhere with real room to walk, found rather than assumed: measuring a
+  // pace against a wall measures the wall.
+  const open = (() => {
+    const pc = world.spot('Parque Central');
+    for (let r = 0; r < 200; r++) {
+      for (const [dx, dy] of [[r, 0], [-r, 0], [0, r], [0, -r]]) {
+        const x = pc.x + dx, y = pc.y + dy;
+        let clear = true;
+        for (let j = -3; j <= 3 && clear; j++)
+          for (let i = -3; i <= 3 && clear; i++)
+            if (SOLID.has(world.at(x + i, y + j))) clear = false;
+        if (clear) return { x, y };
+      }
+    }
+    return pc;
+  })();
+  const walk = (mag) => {
+    world.S.px = open.x * TS + 8; world.S.py = open.y * TS + 8;
+    const from = world.S.px;
+    for (let i = 0; i < 20; i++) world.move(16, { x: mag, y: 0 });
+    return Math.abs(world.S.px - from);
+  };
+  const full = walk(1), half = walk(0.5);
+  assert.ok(full > 0, 'a full push moved nowhere');
+  assert.ok(Math.abs(half - full / 2) < full * 0.15,
+    `half a push went ${half.toFixed(1)}px against a full ${full.toFixed(1)}px`);
+  // And a stick at rest is a person at rest.
+  world.move(16, { x: 0, y: 0 });
+  assert.equal(world.S.moving, false);
 });
 
 test('the painter paints', () => {
@@ -289,11 +328,41 @@ test('leaving and coming back does not stack a second set of listeners', () => {
 });
 
 test('a long press on the controls is refused, not offered as Copy', () => {
-  // Android and desktop raise contextmenu on a long press; iOS is handled by
-  // -webkit-touch-callout in the stylesheet, which cannot be tested from here.
+  // Three separate things had to be true to stop the phone buzzing at you.
+  // iOS is handled by -webkit-touch-callout in the stylesheet, which cannot be
+  // tested from here; these are the two that can.
   const sec = document.getElementById('sc-game');
   assert.equal(sec.listenerCount('contextmenu'), 1, 'nothing suppresses contextmenu');
   assert.equal(sec.fire('contextmenu'), true, 'contextmenu was not prevented');
+
+  // preventDefault on touchstart is the one that actually stops Android
+  // starting a selection, and the haptic that comes with it.
+  for (const id of ['gameStick', 'gameA']) {
+    const node = document.getElementById(id);
+    assert.equal(node.listenerCount('touchstart'), 1, `${id} does not eat touchstart`);
+    assert.equal(node.fire('touchstart'), true, `${id} did not prevent touchstart`);
+  }
+});
+
+test('the stick pushes, springs back, and ignores a resting thumb', () => {
+  store.setUser('stick');
+  screen.start({ missions, crowd });
+  const stick = document.getElementById('gameStick');
+  const knob = document.getElementById('gameKnob');
+
+  // dead centre: a thumb resting on it must not walk you anywhere
+  stick.fire('pointerdown', { pointerId: 1, clientX: 86, clientY: 666 });
+  assert.equal(knob.style.transform, 'translate(0px, 0px)');
+
+  // pushed right: the knob follows and the world is told to walk
+  stick.fire('pointermove', { pointerId: 1, clientX: 86 + 60, clientY: 666 });
+  assert.ok(/translate\([1-9]/.test(knob.style.transform),
+    `knob did not move: ${knob.style.transform}`);
+
+  // let go and it springs back to the middle
+  stick.fire('pointerup', { pointerId: 1 });
+  assert.equal(knob.style.transform, 'translate(0px, 0px)');
+  screen.stop();
 });
 
 test('the HUD counts the missions, not the crowd', () => {

@@ -339,19 +339,28 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
     !blocked(x - 4, y + 4) && !blocked(x + 4, y + 4) &&
     !blocked(x - 4, y - 2) && !blocked(x + 4, y - 2);
 
-  function move(dt, held) {
+  /**
+   * @param vec  where the stick is pushed: x and y each -1..1, already
+   *             scaled by how far it is pushed. A keyboard hands over a
+   *             normalised (±1, ±1); a thumb hands over anything in between,
+   *             which is what lets you walk slowly along a pavement instead of
+   *             barrelling everywhere at one speed.
+   */
+  function move(dt, vec) {
     // The city is five and a half kilometres across at five metres to a tile,
-    // so this is about twenty times real walking — the usual lie a top-down
-    // game tells, and the alternative is a six-minute walk to the market.
+    // so full push is about twenty times real walking — the usual lie a
+    // top-down game tells, and the alternative is a six-minute walk to the
+    // market.
     const sp = dt * 0.105;
-    let dx = 0, dy = 0;
-    if (held.left)  { dx -= sp; S.dir = 2; }
-    if (held.right) { dx += sp; S.dir = 3; }
-    if (held.up)    { dy -= sp; S.dir = 1; }
-    if (held.down)  { dy += sp; S.dir = 0; }
+    const vx = Math.max(-1, Math.min(1, (vec && vec.x) || 0));
+    const vy = Math.max(-1, Math.min(1, (vec && vec.y) || 0));
+    const dx = vx * sp, dy = vy * sp;
+    if (Math.abs(vx) > Math.abs(vy)) S.dir = vx < 0 ? 2 : 3;
+    else if (vy) S.dir = vy < 0 ? 1 : 0;
     S.moving = !!(dx || dy);
     if (!S.moving) { S.step = 0; return; }
-    S.step += dt * 0.35;
+    // Feet keep up with the pace, so a slow walk is not a sprint animation.
+    S.step += dt * 0.35 * Math.min(1, Math.hypot(vx, vy));
     if (canGo(S.px + dx, S.py)) S.px += dx;
     if (canGo(S.px, S.py + dy)) S.py += dy;
     S.px = Math.max(6, Math.min(W * TS - 6, S.px));

@@ -261,14 +261,15 @@
     </div>
 
     <div class="gpad">
-      <div class="dpad">
-        <button class="dbtn u" data-dir="up" type="button" aria-label="Walk north">▲</button>
-        <button class="dbtn l" data-dir="left" type="button" aria-label="Walk west">◀</button>
-        <div class="dmid"></div>
-        <button class="dbtn r" data-dir="right" type="button" aria-label="Walk east">▶</button>
-        <button class="dbtn d" data-dir="down" type="button" aria-label="Walk south">▼</button>
+      <!-- A stick, not a d-pad: you walk in any direction and as slowly as you
+           like. It also has no text in it, which matters — a long press on the
+           old arrows had Android grabbing the character inside the button and
+           buzzing at you. The A is generated content for the same reason. -->
+      <div class="stick" id="gameStick" role="application" aria-label="Walk">
+        <div class="stick-ring"></div>
+        <div class="stick-knob" id="gameKnob"></div>
       </div>
-      <button class="abtn" id="gameA" type="button">A</button>
+      <button class="abtn" id="gameA" type="button" aria-label="Talk"></button>
     </div>
     <nav class="tabs" id="tabsGame"></nav>
   </section>

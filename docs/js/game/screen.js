@@ -100,10 +100,7 @@ function frame(t) {
   const { world, painter, ctx } = G;
 
   if (!G.talking) {
-    world.move(dt, {
-      left: isHeld('left'), right: isHeld('right'),
-      up: isHeld('up'), down: isHeld('down'),
-    });
+    world.move(dt, stickVector());
     world.traffic(dt);
   }
   painter.frame(ctx, t, G.VW, G.VH, G.SCALE);
@@ -402,13 +399,69 @@ function finish() {
 }
 
 // ── controls ────────────────────────────────────────────────
-const IMPULSE = 130;   // ms of travel a single tap is worth
+// A thumbstick rather than a d-pad. You walk in any direction and as slowly as
+// you like, and — the reason it went in when it did — there is no text
+// anywhere in it, so Android has nothing to try to select when you hold it
+// down. That was the buzzing.
+const STICK = { on: false, id: null, cx: 0, cy: 0, r: 52, x: 0, y: 0 };
+const DEAD = 0.12;          // ignore the first tenth, so resting a thumb drifts nowhere
+
+// The keyboard still works, and it pushes the same stick.
+const KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+               w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right' };
+const IMPULSE = 130;   // ms of travel a single tap of a key is worth
 function press(dir) { G.held[dir] = true; G.minHold[dir] = performance.now() + IMPULSE; }
 function release(dir) { G.held[dir] = false; }
 function isHeld(dir) { return G.held[dir] || (G.minHold[dir] || 0) > performance.now(); }
 
-const KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-               w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right' };
+function stickVector() {
+  if (STICK.on) return { x: STICK.x, y: STICK.y };
+  let x = 0, y = 0;
+  if (isHeld('left')) x -= 1;
+  if (isHeld('right')) x += 1;
+  if (isHeld('up')) y -= 1;
+  if (isHeld('down')) y += 1;
+  if (x && y) { x *= 0.7071; y *= 0.7071; }      // a key is full push, not 1.41x
+  return { x, y };
+}
+
+function knobTo(x, y) {
+  const k = $('gameKnob');
+  if (k && k.style) k.style.transform = `translate(${x * STICK.r}px, ${y * STICK.r}px)`;
+}
+
+function stickStart(e) {
+  const stick = $('gameStick');
+  const r = stick.getBoundingClientRect();
+  STICK.on = true; STICK.id = e.pointerId;
+  STICK.cx = r.left + r.width / 2; STICK.cy = r.top + r.height / 2;
+  STICK.r = Math.max(28, r.width / 2 - 14);
+  stick.classList.add('live');
+  if (stick.setPointerCapture) { try { stick.setPointerCapture(e.pointerId); } catch {} }
+  stickMove(e);
+}
+
+function stickMove(e) {
+  if (!STICK.on || (STICK.id !== null && e.pointerId !== STICK.id)) return;
+  const dx = e.clientX - STICK.cx, dy = e.clientY - STICK.cy;
+  const len = Math.hypot(dx, dy);
+  const mag = Math.min(1, len / STICK.r);
+  if (mag < DEAD || !len) { STICK.x = 0; STICK.y = 0; knobTo(0, 0); return; }
+  // Rescale past the dead zone so the very first millimetre of real movement
+  // is a crawl rather than a jump.
+  const push = (mag - DEAD) / (1 - DEAD);
+  STICK.x = (dx / len) * push;
+  STICK.y = (dy / len) * push;
+  knobTo((dx / len) * mag, (dy / len) * mag);
+}
+
+function stickEnd(e) {
+  if (STICK.id !== null && e && e.pointerId !== undefined && e.pointerId !== STICK.id) return;
+  STICK.on = false; STICK.id = null; STICK.x = 0; STICK.y = 0;
+  const stick = $('gameStick');
+  if (stick) stick.classList.remove('live');
+  knobTo(0, 0);
+}
 
 let wired = false;
 function wireControls() {
@@ -431,15 +484,21 @@ function wireControls() {
   const sec = document.getElementById('sc-game');
   if (sec) sec.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  for (const b of document.querySelectorAll('#sc-game .dbtn')) {
-    const dir = b.dataset.dir;
-    const on = (e) => { e.preventDefault(); if (G) press(dir); b.classList.add('held'); };
-    const off = () => { if (G) release(dir); b.classList.remove('held'); };
-    b.addEventListener('pointerdown', on);
-    b.addEventListener('pointerup', off);
-    b.addEventListener('pointerleave', off);
-    b.addEventListener('pointercancel', off);
+  const stick = $('gameStick');
+  if (stick) {
+    stick.addEventListener('pointerdown', (e) => { e.preventDefault(); if (G) stickStart(e); });
+    stick.addEventListener('pointermove', (e) => { if (G) stickMove(e); });
+    stick.addEventListener('pointerup', (e) => { if (G) stickEnd(e); });
+    stick.addEventListener('pointercancel', (e) => { if (G) stickEnd(e); });
+    stick.addEventListener('lostpointercapture', (e) => { if (G) stickEnd(e); });
+    // preventDefault on touchstart is the one that actually stops Android
+    // starting a long-press selection — and the haptic that comes with it.
+    // Doing it on pointerdown alone was not enough.
+    stick.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
   }
+  const abtn = $('gameA');
+  if (abtn) abtn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+
   addEventListener('keydown', (e) => {
     if (!G || G.talking) return;
     const k = KEYS[e.key];

@@ -965,24 +965,42 @@ button.setrow:active { border-color: var(--oro-d); background: var(--ceniza2); }
   align-items: center; justify-content: space-between;
   background: var(--basalt); border-top: 1px solid var(--linea);
 }
-#sc-game .dpad { display: grid; grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 42px); }
-#sc-game .dbtn {
-  border: 1px solid var(--linea); background: var(--ceniza); color: var(--txt2);
-  font: inherit; font-size: 15px; cursor: pointer; display: grid; place-items: center;
-  touch-action: none;
+/* the stick */
+#sc-game .stick {
+  position: relative; width: 132px; height: 132px; flex: none;
+  touch-action: none; cursor: grab;
 }
-#sc-game .dbtn:active, #sc-game .dbtn.held { background: var(--ceniza2); color: var(--oro); }
-#sc-game .dbtn.u { grid-area: 1/2; border-radius: 10px 10px 0 0; }
-#sc-game .dbtn.l { grid-area: 2/1; border-radius: 10px 0 0 10px; }
-#sc-game .dbtn.r { grid-area: 2/3; border-radius: 0 10px 10px 0; }
-#sc-game .dbtn.d { grid-area: 3/2; border-radius: 0 0 10px 10px; }
-#sc-game .dmid { grid-area: 2/2; background: var(--ceniza); border-top: 1px solid var(--linea); border-bottom: 1px solid var(--linea); }
+#sc-game .stick-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, rgba(44,36,34,.9), rgba(20,16,14,.86));
+  border: 1px solid var(--linea);
+  box-shadow: inset 0 2px 10px rgba(0,0,0,.5);
+}
+/* a faint cross so it reads as a control and not as a hole */
+#sc-game .stick-ring::before,
+#sc-game .stick-ring::after {
+  content: ''; position: absolute; background: var(--linea); opacity: .6;
+}
+#sc-game .stick-ring::before { left: 50%; top: 16%; bottom: 16%; width: 1px; margin-left: -.5px; }
+#sc-game .stick-ring::after { top: 50%; left: 16%; right: 16%; height: 1px; margin-top: -.5px; }
+#sc-game .stick-knob {
+  position: absolute; left: 50%; top: 50%; width: 58px; height: 58px;
+  margin: -29px 0 0 -29px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #4A3C30, #241C18);
+  border: 1px solid var(--oro-d);
+  box-shadow: 0 3px 10px rgba(0,0,0,.55);
+  transition: transform .12s cubic-bezier(.3,1.3,.5,1);
+  will-change: transform;
+}
+#sc-game .stick.live .stick-knob { transition: none; border-color: var(--oro); }
+
 #sc-game .abtn {
   width: 72px; height: 72px; border-radius: 50%; border: 1px solid var(--oro-d);
   background: radial-gradient(circle at 34% 30%, #3A2A14, #1B1410);
   color: var(--txt3); font: inherit; font-size: 12px; font-weight: 700;
   letter-spacing: .08em; cursor: pointer; text-transform: uppercase;
 }
+#sc-game .abtn::after { content: 'A'; }
 #sc-game .abtn.live { color: var(--oro); border-color: var(--oro); box-shadow: 0 0 0 4px rgba(232,163,61,.13); }
 
 /* the quest log */
