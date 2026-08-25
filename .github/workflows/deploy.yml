@@ -42,6 +42,11 @@ jobs:
       - name: Test the mascots
         run: node docs/js/creatures.test.mjs
 
+      # A pack field that is added everywhere except applyPack() arrives,
+      # gets cached, and never reaches the app. That shipped once.
+      - name: Test that a downloaded course reaches the app
+        run: node docs/js/content.test.mjs
+
       # Granada cannot be played in CI and cannot be played from a terminal
       # either, so the only way to know the city still works is to run it.
       # This loads the real modules behind a stub DOM and checks that nobody is

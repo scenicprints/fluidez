@@ -205,6 +205,11 @@ function applyPack(pack) {
   content.lessons = pack.lessons || [];
   content.scenarios = pack.scenarios || [];
   content.verbs = pack.verbs || null;
+  // Every field has to be named here. It is not a spread, so a pack field that
+  // is added everywhere else and forgotten in this one function arrives, gets
+  // cached, and never reaches the app: that is exactly how Granada shipped
+  // with its tab showing and "the game has not been downloaded yet" behind it.
+  content.game = pack.game || null;
   content.momo = pack.momo || [];
   content.mascot = pack.mascot || null;
   content.phases = pack.phases || null;
