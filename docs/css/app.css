@@ -27,11 +27,34 @@
   --papel: #F4E9D6; --papel2: #EADCC2; --tinta: #2B211A; --tinta2: #7A6552;
   --txt: #EFE7DC; --txt2: #A99C8E; --txt3: #6E635A;
 
+  /* Chrome, deliberately separate from the memory colours above. --oro means
+     "growing" and nothing else; --accent means "this app". They happen to be
+     the same gold in Nicaraguan Spanish, which is why that course is
+     untouched by this split. */
+  --accent: #E8A33D; --accent-d: #8A5F1E; --accent-ink: #241A0A;
+  --chrome-grad: linear-gradient(96deg, var(--oro), #D98F2E);
+  --perch-glow: radial-gradient(70% 74% at 50% 96%, rgba(232,163,61,.14), transparent 70%);
+
   --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 
   --top: env(safe-area-inset-top, 0px);
   --bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Swiss German: alpine night ─────────────────────────────
+   Red and white on neutral charcoal. Not blue: blue and white is Nicaragua's
+   own flag, which would make the second course look more like the first.
+   The memory colours are not touched here on purpose. */
+[data-course="de-ch"] {
+  --basalt: #131417; --basalt2: #0C0D0F;
+  --ceniza: #1C1E22; --ceniza2: #26282E; --ceniza3: #313440;
+  --linea: #34373E;
+  --papel: #F2F0EA; --papel2: #E6E4DE; --tinta: #1E2024; --tinta2: #6B6F78;
+  --txt: #F0F1F3; --txt2: #A6AAB2; --txt3: #6F737C;
+  --accent: #E0392E; --accent-d: #7E211B; --accent-ink: #FFFFFF;
+  --chrome-grad: linear-gradient(135deg, #FFFFFF, #F2A49D 16%, #E8463B 46%, #AB1D14);
+  --perch-glow: radial-gradient(72% 76% at 50% 96%, rgba(255,255,255,.07), rgba(224,57,46,.13) 42%, transparent 72%);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -49,7 +72,7 @@ body { display: flex; flex-direction: column; }
 .en { font-family: var(--sans); }
 
 button { font-family: inherit; color: inherit; }
-:focus-visible { outline: 2px solid var(--oro); outline-offset: 2px; border-radius: 8px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
 
 /* ── app frame ─────────────────────────────────────────── */
 #app { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
@@ -67,7 +90,7 @@ button { font-family: inherit; color: inherit; }
   padding: calc(var(--top) + 14px) 18px 12px;
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none;
 }
-.brand { font-family: var(--serif); font-size: 21px; color: var(--oro); line-height: 1; }
+.brand { font-family: var(--serif); font-size: 21px; color: var(--accent); line-height: 1; }
 .sub-lang {
   display: flex; align-items: center; gap: 5px; margin-top: 5px;
   font-size: 9.5px; letter-spacing: .15em; text-transform: uppercase; color: var(--txt3);
@@ -80,7 +103,7 @@ button { font-family: inherit; color: inherit; }
 
 .levelchip {
   padding: 7px 13px; border-radius: 999px; background: var(--ceniza2);
-  border: 1px solid var(--linea); color: var(--oro);
+  border: 1px solid var(--linea); color: var(--accent);
   font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;
 }
 .iconbtn {
@@ -89,7 +112,7 @@ button { font-family: inherit; color: inherit; }
   display: grid; place-items: center; flex: none; transition: transform .3s, border-color .16s, color .16s;
 }
 .iconbtn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.iconbtn:active { transform: rotate(80deg) scale(.92); border-color: var(--oro-d); color: var(--oro); }
+.iconbtn:active { transform: rotate(80deg) scale(.92); border-color: var(--accent-d); color: var(--accent); }
 
 .pad { padding: 0 18px 24px; display: flex; flex-direction: column; gap: 12px; }
 .label { font-size: 9.5px; letter-spacing: .19em; text-transform: uppercase; color: var(--txt3); margin: 0 0 9px; }
@@ -99,11 +122,11 @@ button { font-family: inherit; color: inherit; }
 
 .card { background: var(--ceniza); border: 1px solid var(--linea); border-radius: 17px; padding: 15px; }
 .card.tap { cursor: pointer; transition: transform .12s, border-color .16s, background .16s; }
-.card.tap:active { transform: scale(.982); border-color: var(--oro-d); background: var(--ceniza2); }
+.card.tap:active { transform: scale(.982); border-color: var(--accent-d); background: var(--ceniza2); }
 
 .go {
   width: 100%; padding: 14px; border-radius: 12px; border: 0; cursor: pointer;
-  background: linear-gradient(96deg, var(--oro), #D98F2E); color: #241A0A;
+  background: var(--chrome-grad); color: var(--accent-ink);
   font-size: 14.5px; font-weight: 800; transition: filter .16s, transform .1s;
 }
 .go:active { transform: scale(.975); filter: brightness(.95); }
@@ -115,7 +138,7 @@ button { font-family: inherit; color: inherit; }
 .perch {
   position: relative; height: 200px; flex: none; cursor: pointer;
   display: flex; align-items: flex-end; justify-content: center;
-  background: radial-gradient(70% 74% at 50% 96%, rgba(232,163,61,.14), transparent 70%);
+  background: var(--perch-glow);
 }
 .perch.sm { height: 128px; }
 .perch.sm .momo-svg { width: 150px; height: 138px; }
@@ -127,7 +150,7 @@ button { font-family: inherit; color: inherit; }
   opacity: 0; transition: opacity .3s, transform .3s; z-index: 5; pointer-events: none; max-width: 90%;
 }
 .speech.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-.speech b { color: var(--oro); font-weight: 600; }
+.speech b { color: var(--accent); font-weight: 600; }
 .sparks { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
 .spark { position: absolute; width: 6px; height: 6px; border-radius: 50%; opacity: 0; left: 50%; top: 44%; }
 .spark.go { animation: burst .85s ease-out forwards; }
@@ -358,11 +381,15 @@ button { font-family: inherit; color: inherit; }
 
 .cont {
   background: linear-gradient(142deg, rgba(232,163,61,.15), rgba(217,97,63,.07) 58%, transparent), var(--ceniza);
-  border-color: var(--oro-d);
+  border-color: var(--accent-d);
+}
+[data-course="de-ch"] .cont {
+  background: linear-gradient(142deg, rgba(255,255,255,.10), rgba(224,57,46,.14) 34%, transparent 70%), var(--ceniza);
 }
 .cont-title { font-family: var(--serif); font-size: 22px; margin: 5px 0 4px; line-height: 1.22; }
 .bar { height: 5px; border-radius: 99px; background: var(--ceniza3); overflow: hidden; margin-top: 13px; }
 .bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--oro), var(--barro)); transition: width .4s; }
+[data-course="de-ch"] .bar i { background: linear-gradient(90deg, #FFFFFF, #F2A49D 22%, #E0392E); }
 
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
 .tile {
@@ -370,8 +397,8 @@ button { font-family: inherit; color: inherit; }
   padding: 14px 8px; text-align: center; cursor: pointer;
   transition: transform .12s, border-color .16s, background .16s;
 }
-.tile:active { transform: scale(.96); border-color: var(--oro-d); background: var(--ceniza2); }
-.tile .ic { width: 22px; height: 22px; display: block; margin: 0 auto 9px; color: var(--oro); fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.tile:active { transform: scale(.96); border-color: var(--accent-d); background: var(--ceniza2); }
+.tile .ic { width: 22px; height: 22px; display: block; margin: 0 auto 9px; color: var(--accent); fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .tile .nm { font-size: 12px; font-weight: 700; display: block; }
 .tile .ct { font-size: 10px; color: var(--txt3); margin-top: 3px; display: block; font-variant-numeric: tabular-nums; }
 
@@ -385,7 +412,7 @@ button { font-family: inherit; color: inherit; }
   background: var(--ceniza2); border: 2px solid var(--linea); color: var(--txt2); position: relative;
 }
 .amigo.live .av { border-color: var(--jade); color: var(--jade); }
-.amigo.me .av { border-color: var(--oro); color: var(--oro); }
+.amigo.me .av { border-color: var(--accent); color: var(--accent); }
 .amigo .an { font-size: 10.5px; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .amigo .as { font-size: 10px; color: var(--oro); font-variant-numeric: tabular-nums; }
 
@@ -401,14 +428,14 @@ button { font-family: inherit; color: inherit; }
   transition: color .16s;
 }
 .tab .ti { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; transition: transform .22s; }
-.tab.on { color: var(--oro); }
+.tab.on { color: var(--accent); }
 .tab.on .ti { transform: translateY(-2px) scale(1.14); }
 .tab:active { color: var(--txt2); }
 
 /* ── path ──────────────────────────────────────────────── */
 .trail { padding: 6px 18px 26px; }
 .phase-h { margin: 22px 0 6px; display: flex; align-items: baseline; gap: 9px; }
-.phase-n { font-family: var(--serif); font-size: 12px; color: var(--basalt); background: var(--oro); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; flex: none; }
+.phase-n { font-family: var(--serif); font-size: 12px; color: var(--accent-ink); background: var(--accent); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; flex: none; }
 .phase-h.locked .phase-n { background: var(--ceniza3); color: var(--txt3); }
 .phase-t { font-size: 14.5px; font-weight: 700; }
 .phase-h.locked .phase-t { color: var(--txt3); }
@@ -421,7 +448,7 @@ button { font-family: inherit; color: inherit; }
 .node:active .dot { transform: scale(.92); }
 .node.done .dot { background: var(--jade-d); border-color: var(--jade); color: var(--papel); }
 .node.now .dot {
-  background: linear-gradient(150deg, var(--oro), #C77F26); border-color: var(--oro); color: #241A0A;
+  background: var(--chrome-grad); border-color: var(--accent); color: var(--accent-ink);
   box-shadow: 0 0 0 5px rgba(232,163,61,.15), 0 0 26px -4px rgba(232,163,61,.7);
   animation: beat 2.4s ease-in-out infinite;
 }
@@ -433,7 +460,7 @@ button { font-family: inherit; color: inherit; }
 .node-t { font-family: var(--serif); font-size: 16px; line-height: 1.2; display: block; }
 .node.lock .node-t { font-family: var(--sans); font-size: 14px; color: var(--txt3); }
 .node-d { font-size: 11px; color: var(--txt3); margin-top: 2px; display: block; }
-.node.now .node-d { color: var(--oro); }
+.node.now .node-d { color: var(--accent); }
 .mini-momo { position: absolute; right: 4px; top: 50%; transform: translateY(-52%); width: 36px; z-index: 3; pointer-events: none; }
 
 /* ── scenes ────────────────────────────────────────────── */
@@ -453,12 +480,12 @@ button { font-family: inherit; color: inherit; }
   width: 100%; background: none; border: 0; padding: 0; margin-left: 0;
   font: inherit; color: inherit; text-align: left; cursor: pointer;
 }
-.ph-btn:active .phase-t { color: var(--oro); }
+.ph-btn:active .phase-t { color: var(--accent); }
 /* The only cue that a heading opens — quiet, but it has to survive a phone
  * screen, and at 10px in --txt3 it did not. */
 .phase-v { flex: none; font-size: 12px; color: var(--txt2); margin-left: 10px; transition: transform .2s; }
 .phase-h.closed .phase-v { transform: rotate(-90deg); }
-@media (hover: hover) { .ph-btn:hover .phase-t { color: var(--oro); } }
+@media (hover: hover) { .ph-btn:hover .phase-t { color: var(--accent); } }
 
 .scene-g { border: 1px solid var(--linea); border-radius: 16px; overflow: hidden; background: var(--ceniza); }
 .scene-r {
@@ -478,13 +505,13 @@ button { font-family: inherit; color: inherit; }
 
 /* ── a friend ──────────────────────────────────────────── */
 #friendPad > * + * { margin-top: 11px; }
-.av.xl { width: 72px; height: 72px; font-size: 27px; border-color: var(--oro-d); color: var(--oro); margin-bottom: 10px; }
+.av.xl { width: 72px; height: 72px; font-size: 27px; border-color: var(--accent-d); color: var(--accent); margin-bottom: 10px; }
 .fr-name { font-size: 20px; font-weight: 700; }
 
 /* Head to head. The bar is the split itself — your share against theirs — so
  * there is no percentage to decode, just which side is longer. */
 .vs-who { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 12px; }
-.vs-me { color: var(--oro); }
+.vs-me { color: var(--accent); }
 .vs-them { color: var(--cielo); }
 .vs + .vs { margin-top: 15px; }
 .vs-k { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--txt3); }
@@ -492,7 +519,7 @@ button { font-family: inherit; color: inherit; }
 .vs-n span { font-size: 18px; font-weight: 700; color: var(--txt2); }
 .vs-n span.win { color: var(--txt); font-size: 21px; }
 .vs-bar { height: 6px; border-radius: 99px; overflow: hidden; background: var(--cielo); display: flex; }
-.vs-bar i { display: block; height: 100%; background: var(--oro); border-right: 2px solid var(--ceniza); transition: width .35s; }
+.vs-bar i { display: block; height: 100%; background: var(--accent); border-right: 2px solid var(--ceniza); transition: width .35s; }
 
 /* ── reader (paper) ────────────────────────────────────── */
 .paper { background: var(--papel); color: var(--tinta); flex: 1; display: flex; flex-direction: column; min-height: 0; }
@@ -518,17 +545,17 @@ button { font-family: inherit; color: inherit; }
 /* ── word sheet ────────────────────────────────────────── */
 .sheet {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 40;
-  background: var(--ceniza); border-top: 1px solid var(--oro-d);
+  background: var(--ceniza); border-top: 1px solid var(--accent-d);
   border-radius: 22px 22px 0 0; padding: 20px 20px calc(26px + var(--bottom));
   transform: translateY(105%); transition: transform .34s cubic-bezier(.3,1.15,.5,1);
   box-shadow: 0 -20px 46px -14px rgba(0,0,0,.8);
 }
 .sheet.up { transform: translateY(0); }
 .sheet .hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.sheet .wd { font-family: var(--serif); font-size: 29px; color: var(--oro); line-height: 1.1; }
+.sheet .wd { font-family: var(--serif); font-size: 29px; color: var(--accent); line-height: 1.1; }
 .sheet .pos { font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--txt3); margin-top: 5px; }
 .sheet .mean { font-size: 16.5px; margin: 11px 0 0; }
-.sheet .note { font-size: 12.5px; color: var(--txt2); line-height: 1.55; margin: 12px 0 0; padding: 11px 13px; border-left: 2px solid var(--oro-d); background: var(--ceniza2); border-radius: 0 9px 9px 0; }
+.sheet .note { font-size: 12.5px; color: var(--txt2); line-height: 1.55; margin: 12px 0 0; padding: 11px 13px; border-left: 2px solid var(--accent-d); background: var(--ceniza2); border-radius: 0 9px 9px 0; }
 .strength { display: flex; align-items: center; gap: 9px; margin-top: 15px; }
 .sbar { flex: 1; height: 4px; border-radius: 99px; background: var(--ceniza3); overflow: hidden; }
 .sbar i { display: block; height: 100%; border-radius: 99px; }
@@ -549,7 +576,7 @@ button { font-family: inherit; color: inherit; }
 
 .opts { display: flex; flex-direction: column; gap: 9px; margin-top: 18px; }
 .opt { text-align: left; background: var(--ceniza); border: 1px solid var(--linea); border-radius: 14px; padding: 13px 15px; cursor: pointer; transition: transform .12s, border-color .16s, background .16s; }
-.opt:active:not(:disabled) { transform: scale(.985); border-color: var(--oro-d); background: var(--ceniza2); }
+.opt:active:not(:disabled) { transform: scale(.985); border-color: var(--accent-d); background: var(--ceniza2); }
 .opt:disabled { cursor: default; opacity: .4; }
 .opt .s { font-family: var(--serif); font-size: 16.5px; display: block; line-height: 1.34; }
 .opt .e { font-size: 11.5px; color: var(--txt3); margin-top: 5px; display: block; }
@@ -859,3 +886,27 @@ button.setrow:active { border-color: var(--oro-d); background: var(--ceniza2); }
     transition-duration: .001ms !important;
   }
 }
+
+/* ── under construction ────────────────────────────────────
+ * Every tile and tab in a course whose content has not been written yet lands
+ * here rather than on a dead button or a screen that half works. The cabin
+ * climbs the cable; nothing else moves. */
+.bau { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px; }
+.bau .scene { width: 100%; max-width: 330px; height: auto; }
+.bau h2 {
+  font-family: var(--serif); font-size: 34px; margin: 16px 0 0; font-weight: 400;
+  background: var(--chrome-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.bau .en { font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--txt3); margin: 5px 0 0; }
+.bau .why { font-size: 13.5px; color: var(--txt2); margin: 15px 0 0; text-align: center; max-width: 28ch; line-height: 1.55; }
+.bau .go { max-width: 220px; margin-top: 22px; }
+.cabin { animation: ride 11s ease-in-out infinite alternate; }
+@keyframes ride { from { transform: translate(0,0); } to { transform: translate(232px,-92px); } }
+@media (prefers-reduced-motion: reduce) { .cabin { animation: none; } }
+
+/* Icons that carry the course's own gradient rather than a flat colour.
+ * userSpaceOnUse against the shared 24x24 grid, because a bounding-box
+ * gradient erases a perfectly straight line — it has no height to map onto. */
+[data-course="de-ch"] .tile .ic { stroke: url(#chromeGrad); color: transparent; }
+[data-course="de-ch"] .tab.on { color: #FFFFFF; }
+[data-course="de-ch"] .tab.on .ti { stroke: url(#chromeGrad); }

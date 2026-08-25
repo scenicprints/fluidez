@@ -3,12 +3,12 @@
 // Rendering is deliberately dumb: each screen redraws from the store whenever
 // it is shown, so there is no view state to get out of sync with progress.
 
-import { $, el, clear, esc, md, showScreen, toast, initials, ago, bytes } from './ui.js';
+import { $, el, clear, esc, md, showScreen, toast, initials, ago, bytes, t } from './ui.js';
 import * as store from './store.js';
 import * as cloud from './cloud.js';
 import * as speech from './speech.js';
-import { content, lessonsByPhase, checkForContentUpdate, cacheSize, packVersion, resolve } from './content.js';
-import { MOMO_MINI, momoSvg, createMomo, daysBetween } from './momo.js';
+import { content, lessonsByPhase, checkForContentUpdate, cacheSize, packVersion, resolve, underConstruction } from './content.js';
+import { mascotMini, mascotSvg, createMascot, daysBetween } from './mascot.js';
 import {
   memoryStrength, band, calcFluency, fadingWords, dueWords, dueCount, leeches, tokenize, cleanWord,
   conjugate, generateExercises, gradeTyped, orderCandidates, scramble, shuffle, pick,
@@ -136,8 +136,10 @@ export function renderToday() {
       <div class="streak">
         <span class="flame">${streak > 0 ? '🔥' : '☀️'}</span>
         <div>
-          <div class="big">${streak} day${streak === 1 ? '' : 's'}</div>
-          <div class="sub">${streak > 0 ? (store.daily.longest() > streak ? `Best is ${store.daily.longest()}` : 'Longest yet — keep it') : 'Do anything today to start one'}</div>
+          <div class="big">${esc(t(streak === 1 ? 'streakDay' : 'streakDays', { n: streak }))}</div>
+          <div class="sub">${esc(streak > 0
+            ? (store.daily.longest() > streak ? t('streakBest', { n: store.daily.longest() }) : t('streakLongest'))
+            : t('streakStart'))}</div>
         </div>
       </div>
       <svg class="ring" viewBox="0 0 44 44" aria-hidden="true">
@@ -156,11 +158,11 @@ export function renderToday() {
     const done = read.includes(next.id);
     const cont = el('div', 'card cont tap');
     cont.innerHTML = `
-      <p class="label">${done ? 'Read it again' : 'Pick up where you left off'}</p>
+      <p class="label">${esc(done ? t('contAgain') : t('contResume'))}</p>
       <div class="cont-title es">${esc(next.title)}</div>
       <div class="sub">${esc(next.desc)} · Phase ${next.phase} · ${esc(phaseName(next.phase))}</div>
       <div class="bar"><i style="width:${Math.round((read.length / Math.max(1, content.lessons.length)) * 100)}%"></i></div>
-      <button class="go" type="button">${done ? 'Open' : 'Start reading'}</button>`;
+      <button class="go" type="button">${esc(done ? t('contOpen') : t('contStart'))}</button>`;
     cont.addEventListener('click', () => openLesson_(next));
     pad.appendChild(cont);
   }
@@ -173,16 +175,21 @@ export function renderToday() {
     if (feature && !content.has(feature)) return;
     tiles.push({ icon, name, count, fn });
   };
-  add('scenes', 'ic-scenes', 'Scenes', `${content.scenarios.length} · ${(prog.scenariosDone || []).length} done`, () => showScreen('scenes'));
-  add('review', 'ic-target', 'Review', owed ? `${owed} due` : 'nothing due', () => startReview());
-  add('verbs', 'ic-verb', 'Verbs', content.verbs ? 'conjugation' : '—', () => startVerbs());
-  add('order', 'ic-order', 'Word order', 'build it', () => startOrder());
-  add('audio', 'ic-ear', 'Listening', 'dictation', () => startDictation());
-  add('audio', 'ic-mic', 'Shadowing', 'say it back', () => startShadow());
-  add('words', 'ic-words', 'Words', `${f.known} known`, () => showScreen('words'));
-  add('patterns', 'ic-pattern', 'Patterns', `${store.patterns.unlocked().length} of ${content.patterns.length}`, () => showScreen('patterns'));
+  // A course whose lessons are not written yet still shows its tiles — the
+  // shape of what is coming — but every one of them goes to Im Bau rather
+  // than opening a screen with nothing on it.
+  const raw = underConstruction();
+  const guard = (fn) => (raw ? openBau : fn);
+  add('scenes', 'ic-scenes', t('scenes'), t('scenesCount', { a: content.scenarios.length, b: (prog.scenariosDone || []).length }), guard(() => showScreen('scenes')));
+  add('review', 'ic-target', t('review'), owed ? t('due', { n: owed }) : t('nothingDue'), guard(() => startReview()));
+  add('verbs', 'ic-verb', t('verbs'), content.verbs ? t('conjugation') : '—', guard(() => startVerbs()));
+  add('order', 'ic-order', t('order'), t('buildIt'), guard(() => startOrder()));
+  add('audio', 'ic-ear', t('listening'), t('dictation'), guard(() => startDictation()));
+  add('audio', 'ic-mic', t('shadowing'), t('sayItBack'), guard(() => startShadow()));
+  add('words', 'ic-words', t('words'), t('known', { n: f.known }), guard(() => showScreen('words')));
+  add('patterns', 'ic-pattern', t('patterns'), t('patternsCount', { a: store.patterns.unlocked().length, b: content.patterns.length }), guard(() => showScreen('patterns')));
   if (content.manifest?.emergency) {
-    add(null, 'ic-life', 'Emergency', 'offline', () => openPhrases());
+    add(null, 'ic-life', t('emergency'), 'offline', guard(() => openPhrases()));
   }
 
   const grid = el('div', 'tiles');
@@ -197,7 +204,7 @@ export function renderToday() {
 
   // friends
   const friends = el('div', 'card');
-  friends.innerHTML = '<p class="label">Learning alongside you</p><div class="amigos" id="amigos"></div>';
+  friends.innerHTML = `<p class="label">${esc(t('friends'))}</p><div class="amigos" id="amigos"></div>`;
   pad.appendChild(friends);
   paintBoard();
 }
@@ -208,7 +215,7 @@ async function paintBoard() {
   clear(host);
   const rows = await cloud.fetchBoard();
   if (!rows.length) {
-    host.innerHTML = '<p class="muted" style="margin:0">Nobody else yet. Send a friend the link and they pick their own user ID.</p>';
+    host.innerHTML = `<p class="muted" style="margin:0">${esc(t('friendsNone'))}</p>`;
     return;
   }
   // Somebody overtaking you is worth hearing about once — not on every render,
@@ -277,7 +284,7 @@ export function renderPath() {
         `<div class="dot">${locked ? '🔒' : done ? '✓' : isNow ? '▶' : '·'}</div>` +
         `<div><span class="node-t es">${esc(lesson.title)}</span>` +
         `<span class="node-d">${esc(isNow ? 'You are here' : lesson.desc)}</span></div>` +
-        (isNow ? MOMO_MINI : '');
+        (isNow ? mascotMini() : '');
       if (!locked) node.addEventListener('click', () => openLesson_(lesson));
       trail.appendChild(node);
     });
@@ -1129,12 +1136,12 @@ let wrapMomo = null;
 
 function wrapBird() {
   if (!wrapMomo) {
-    $('wrapMomo').innerHTML = momoSvg('wrap');
+    $('wrapMomo').innerHTML = mascotSvg('wrap');
     // ambient: false — a second self-arming sleep timer and a second
     // document-wide activity listener would fight the one on Today.
     // poke: false — here he answers your score and nothing else. Poking him
     // belongs on Today; on this screen it would talk over the result.
-    wrapMomo = createMomo($('wrapMomo'), $('wrapSpeech'), $('wrapSparks'),
+    wrapMomo = createMascot($('wrapMomo'), $('wrapSpeech'), $('wrapSparks'),
       { ambient: false, poke: false });
   }
   return wrapMomo;
@@ -1598,6 +1605,18 @@ export function openPhrases() {
   showScreen('phrases');
 }
 
+// ══ UNDER CONSTRUCTION ══════════════════════════════════════
+// A new course ships its palette, its mascot and its interface before a single
+// story exists. Rather than let its tiles open blank screens, they all land
+// here. It stops being reachable the moment the first lesson is published.
+export function openBau() {
+  $('bauTitle').textContent = t('bauTitle');
+  $('bauSub').textContent = t('bauSub');
+  $('bauWhy').textContent = t('bauWhy');
+  $('bauBack').textContent = t('bauBack');
+  showScreen('bau');
+}
+
 // ══ SETTINGS ════════════════════════════════════════════════
 let onSignOut = () => {};
 let onSwitchLanguage = () => {};
@@ -1739,6 +1758,8 @@ function wire() {
   $('patClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
   $('phrasesClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
   $('settingsClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
+  $('bauClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
+  $('bauBack').addEventListener('click', () => { showScreen('today'); renderToday(); });
   $('gearBtn').addEventListener('click', () => { showScreen('settings'); renderSettings(); });
   $('wuCard').addEventListener('click', revealWarmup);
   $('wuNext').addEventListener('click', advanceWarmup);
@@ -1759,7 +1780,7 @@ function wire() {
 }
 
 export const RENDERERS = {
-  today: renderToday, path: renderPath, scenes: renderScenes,
+  today: renderToday, path: renderPath, scenes: renderScenes, bau: openBau,
   words: renderWords, patterns: renderPatterns, settings: renderSettings,
   fluency: renderFluency, map: renderMap,
 };

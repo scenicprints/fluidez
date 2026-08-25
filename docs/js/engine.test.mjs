@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import {
   memoryStrength, evidence, dueAt, dueWords, dueCount, band, tokenize, cleanWord, conjugate, calcFluency,
   fadingWords, leeches, gradeTyped, normalizeAnswer, orderCandidates,
-  scramble, generateExercises, phaseName,
+  scramble, generateExercises, phaseName, phaseDesc, setPhases,
 } from './engine.js';
 
 let passed = 0;
@@ -405,6 +405,21 @@ test('all eight phases are named', () => {
   assert.equal(phaseName(0), 'Survival');
   assert.equal(phaseName(7), 'Native-Like');
   assert.equal(phaseName(99), 'Phase 99');
+
+  // A pack may ship its own ladder; anything malformed falls back rather than
+  // throwing, because a broken phase list must not take the whole course down.
+  setPhases([['Ankommen', 'der/die/das'], ['Einleben', 'Modalverben']]);
+  assert.equal(phaseName(0), 'Ankommen');
+  assert.equal(phaseDesc(1), 'Modalverben');
+  assert.equal(phaseName(7), 'Phase 7');
+  setPhases([{ name: 'Landing', desc: 'first words' }]);
+  assert.equal(phaseName(0), 'Landing');
+  setPhases([]);
+  assert.equal(phaseName(0), 'Survival');
+  setPhases([{ nope: 1 }, null]);
+  assert.equal(phaseName(0), 'Survival');
+  setPhases(null);
+  assert.equal(phaseName(7), 'Native-Like');
 });
 
 console.log(`${passed} passed${process.exitCode ? ', SOME FAILED' : ''}`);

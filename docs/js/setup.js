@@ -10,7 +10,7 @@ import * as store from './store.js';
 import * as authLib from './auth.js';
 import * as cloud from './cloud.js';
 import { content, loadLanguages, findLanguage, loadCachedPack, downloadPack } from './content.js';
-import { momoSvg } from './momo.js';
+import { mascotSvg } from './mascot.js';
 
 let finish = () => {};
 let mode = 'signup';          // or 'signin'
@@ -18,7 +18,7 @@ let account = null;           // { userId, name, language }
 
 export function startSetup(onDone) {
   finish = onDone;
-  $('splashMomo').innerHTML = momoSvg('splash');
+  $('splashMomo').innerHTML = mascotSvg('splash');
   wireLogin();
   wireInstall();
   wireNotify();

@@ -107,7 +107,12 @@ export function tokenize(text) {
 }
 
 // ── PHASES ──────────────────────────────────────────────────
-export const PHASES = [
+// The ladder a course climbs. These used to be hardcoded, which was fine while
+// there was one language and wrong the moment there were two: "Markets, taxis,
+// directions" is Nicaragua, and a course set in Switzerland climbs a different
+// ladder in a different order. A pack declares its own; this is the fallback
+// for content old enough not to.
+const DEFAULT_PHASES = [
   ['Survival', 'Greetings, numbers, basic needs'],
   ['Getting Around', 'Markets, taxis, directions, transactions'],
   ['Connecting', 'Small talk, friends, talking about yourself'],
@@ -117,8 +122,28 @@ export const PHASES = [
   ['Sounding Local', 'Nuance, double meanings, abstract talk'],
   ['Native-Like', 'Wordplay, in-jokes, the long tail'],
 ];
-export const phaseName = (p) => (PHASES[p] ? PHASES[p][0] : `Phase ${p}`);
-export const phaseDesc = (p) => (PHASES[p] ? PHASES[p][1] : '');
+
+let phases = DEFAULT_PHASES;
+
+/**
+ * Take the phase ladder from a language pack. Accepts either
+ * `[["Landing","der/die/das…"], …]` or `[{name, desc}, …]`, because the pack
+ * is JSON written by hand and both shapes are natural to write.
+ *
+ * Anything empty or malformed falls back rather than throwing: a course with a
+ * broken phase list should still be readable, just with generic headings.
+ */
+export function setPhases(list) {
+  if (!Array.isArray(list) || !list.length) { phases = DEFAULT_PHASES; return phases; }
+  const clean = list
+    .map((p) => (Array.isArray(p) ? [p[0], p[1]] : [p?.name, p?.desc]))
+    .filter((p) => typeof p[0] === 'string' && p[0]);
+  phases = clean.length ? clean.map((p) => [p[0], p[1] || '']) : DEFAULT_PHASES;
+  return phases;
+}
+
+export const phaseName = (p) => (phases[p] ? phases[p][0] : `Phase ${p}`);
+export const phaseDesc = (p) => (phases[p] ? phases[p][1] : '');
 
 // ── CONJUGATION ─────────────────────────────────────────────
 // Driven entirely by the language's verbs.json, so a language without one

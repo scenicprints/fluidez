@@ -8,6 +8,9 @@
 // The entire pack is downloaded once and kept in local storage, so the app
 // works with no signal at all. That is the point: this gets used in Nicaragua.
 
+import { setPhases } from './engine.js';
+import { setStrings } from './ui.js';
+
 const REGISTRY = {
   user: 'scenicprints',
   repo: 'fluidez-languages',
@@ -104,6 +107,10 @@ export const content = {
   scenarios: [],
   verbs: null,
   momo: [],           // what the mascot may say, gated on vocabulary
+  mascot: null,       // which creature this course has, by id — see creatures.js
+  phases: null,       // this course's own phase ladder
+  ui: null,           // this course's interface strings
+  icons: null,        // per-course tab icons, e.g. a gondola instead of a volcano
 
   features() {
     const declared = this.manifest && this.manifest.features;
@@ -195,6 +202,21 @@ function applyPack(pack) {
   content.scenarios = pack.scenarios || [];
   content.verbs = pack.verbs || null;
   content.momo = pack.momo || [];
+  content.mascot = pack.mascot || null;
+  content.phases = pack.phases || null;
+  content.ui = pack.ui || null;
+  content.icons = pack.icons || null;
+  setStrings(pack.ui);
+  // The course goes on <html> so the stylesheet can repaint the whole app
+  // without a single screen having to know which language it is showing.
+  try {
+    if (pack.language && pack.language.code) {
+      document.documentElement.dataset.course = pack.language.code;
+    }
+  } catch {}
+  // The engine owns phase names because every screen reads them from there.
+  // A pack with none falls back to the original ladder rather than to blanks.
+  setPhases(pack.phases);
 }
 
 export function packVersion(code) {
@@ -239,6 +261,13 @@ function applyBundle(lang, bundle, onProgress) {
     lessons: (bundle.lessons || []).map(asLesson),
     scenarios: (bundle.scenarios || []).map(asScenario),
     verbs: bundle.verbs || null,
+    // Declared by the course, not guessed from the language code, so a new
+    // language ships its own mascot and its own ladder with no app release
+    // beyond the artwork itself.
+    mascot: bundle.mascot || null,
+    phases: bundle.phases || null,
+    ui: bundle.ui || null,
+    icons: bundle.icons || null,
     // A pack built before Momo had lines simply has none, and the app falls
     // back to its built-in English set rather than showing a mute bird.
     momo: (bundle.momo && bundle.momo.lines) || bundle.momo || [],
@@ -329,7 +358,9 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
   // No forms map on this path: it is built by the content repo's CI alongside
   // pack.json, and this branch only runs for content old enough not to have
   // one. Lookups fall back to exact matches, exactly as they used to.
-  const pack = { language: lang, manifest, dict, forms: {}, patterns, lessons, scenarios, verbs, momo, fetchedAt: Date.now() };
+  const pack = { language: lang, manifest, dict, forms: {}, patterns, lessons, scenarios, verbs, momo,
+                 mascot: manifest.mascot || null, phases: manifest.phases || null,
+                 ui: manifest.ui || null, icons: manifest.icons || null, fetchedAt: Date.now() };
   applyPack(pack);
   const stored = cacheWrite(CK.pack(lang.code), pack);
   onProgress({ phase: 'done', done: total, total, stored });
@@ -374,6 +405,18 @@ export function scenariosByPhase() {
     map.get(s.phase).push(s);
   }
   return [...map.entries()].sort((a, b) => a[0] - b[0]);
+}
+
+/**
+ * Has this course actually got anything to read yet?
+ *
+ * A brand new language ships its palette, its mascot and its interface before
+ * a single story is written. Its tiles would open empty screens, so they open
+ * the under-construction screen instead — which is honest, and self-corrects
+ * the moment the first lesson lands.
+ */
+export function underConstruction() {
+  return !content.lessons.length;
 }
 
 export function lookup(word) {

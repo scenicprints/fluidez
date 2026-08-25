@@ -37,6 +37,11 @@ jobs:
       - name: Test the learning engine
         run: node docs/js/engine.test.mjs
 
+      # A mascot with a broken rig paints nothing and throws nothing, so it
+      # has to be asserted rather than looked at.
+      - name: Test the mascots
+        run: node docs/js/creatures.test.mjs
+
       # Numbers only. The version is embedded in asset URLs, and a "+" in a
       # query string decodes as a space - which silently broke the app's
       # "am I up to date?" comparison and left an update banner showing

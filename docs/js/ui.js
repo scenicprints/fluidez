@@ -54,28 +54,68 @@ export function toast(msg, ms = 2600) {
   toastTimer = setTimeout(() => t.classList.remove('show'), ms);
 }
 
+// ── interface language ──────────────────────────────────────
+// The labels used to be English constants, which was fine while there was one
+// course and wrong the moment there were two. A pack ships its own `ui` block;
+// anything it does not name falls back to the English below, so a course that
+// declares nothing behaves exactly as it always did.
+const EN = {
+  today: 'Today', path: 'Path', scenes: 'Scenes', words: 'Words',
+  review: 'Review', verbs: 'Verbs', order: 'Word order',
+  listening: 'Listening', shadowing: 'Shadowing', patterns: 'Patterns',
+  emergency: 'Emergency',
+  conjugation: 'conjugation', buildIt: 'build it', dictation: 'dictation',
+  sayItBack: 'say it back', nothingDue: 'nothing due', due: '{n} due',
+  known: '{n} known', scenesCount: '{a} · {b} done', patternsCount: '{a} of {b}',
+  streakDays: '{n} days', streakDay: '{n} day',
+  streakStart: 'Do anything today to start one',
+  streakBest: 'Best is {n}', streakLongest: 'Longest yet — keep it',
+  contResume: 'Pick up where you left off', contAgain: 'Read it again',
+  contStart: 'Start reading', contOpen: 'Open',
+  friends: 'Learning alongside you',
+  friendsNone: 'Nobody else yet. Send a friend the link and they pick their own user ID.',
+  bauTitle: 'Under construction', bauSub: 'not built yet',
+  bauWhy: 'This part of the course has not been written yet. It is coming.',
+  bauBack: 'Back to today',
+};
+
+let strings = {};
+
+/** Take the interface strings a pack ships. Anything missing stays English. */
+export function setStrings(ui) { strings = (ui && typeof ui === 'object') ? ui : {}; }
+
+/** A label, with {placeholders} filled in. */
+export function t(key, vars) {
+  let out = strings[key] != null ? String(strings[key]) : (EN[key] != null ? EN[key] : key);
+  if (vars) for (const k of Object.keys(vars)) out = out.split('{' + k + '}').join(vars[k]);
+  return out;
+}
+
 // ── tab bar ─────────────────────────────────────────────────
 // Built from whatever the language actually supports, so a course with no
-// scenes simply has no Scenes tab rather than an empty one.
+// scenes simply has no Scenes tab rather than an empty one. The icon is part
+// of the course too: Nicaragua's Path is a volcano, Switzerland's is a gondola.
 const TAB_DEFS = [
-  { screen: 'today', icon: 'ic-today', label: 'Today', feature: null },
-  { screen: 'path', icon: 'ic-path', label: 'Path', feature: 'reader' },
-  { screen: 'scenes', icon: 'ic-scenes', label: 'Scenes', feature: 'scenes' },
-  { screen: 'words', icon: 'ic-words', label: 'Words', feature: 'words' },
+  { screen: 'today', icon: 'ic-today', label: 'today', feature: null },
+  { screen: 'path', icon: 'ic-path', label: 'path', feature: 'reader' },
+  { screen: 'scenes', icon: 'ic-scenes', label: 'scenes', feature: 'scenes' },
+  { screen: 'words', icon: 'ic-words', label: 'words', feature: 'words' },
 ];
 
-export function buildTabs(hasFeature, go) {
-  const tabs = TAB_DEFS.filter((t) => !t.feature || hasFeature(t.feature));
+export function buildTabs(hasFeature, go, icons) {
+  const tabs = TAB_DEFS
+    .filter((t2) => !t2.feature || hasFeature(t2.feature))
+    .map((t2) => ({ ...t2, icon: (icons && icons[t2.screen]) || t2.icon }));
   for (const nav of document.querySelectorAll('nav.tabs')) {
     clear(nav);
     nav.style.setProperty('--tabs', tabs.length);
-    for (const t of tabs) {
+    for (const tab of tabs) {
       const b = el('button', 'tab');
       b.type = 'button';
-      b.dataset.screen = t.screen;
-      b.innerHTML = `<svg class="ti"><use href="#${t.icon}"/></svg>`;
-      b.appendChild(document.createTextNode(t.label));
-      b.addEventListener('click', () => go(t.screen));
+      b.dataset.screen = tab.screen;
+      b.innerHTML = `<svg class="ti"><use href="#${tab.icon}"/></svg>`;
+      b.appendChild(document.createTextNode(t(tab.label)));
+      b.addEventListener('click', () => go(tab.screen));
       nav.appendChild(b);
     }
   }

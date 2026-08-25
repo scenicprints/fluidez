@@ -7,8 +7,8 @@ import { $, showScreen, showPane, buildTabs, toast, onScreen } from './ui.js';
 import * as store from './store.js';
 import * as authLib from './auth.js';
 import * as cloud from './cloud.js';
-import { content, loadLanguages, findLanguage, loadCachedPack, checkForContentUpdate } from './content.js';
-import { momoSvg, createMomo } from './momo.js';
+import { content, loadLanguages, findLanguage, loadCachedPack, checkForContentUpdate, underConstruction } from './content.js';
+import { mascotSvg, createMascot, setCreature } from './mascot.js';
 import { startSetup, splashSays, showLanguagePicker, adoptAccount } from './setup.js';
 import * as screens from './screens.js';
 
@@ -227,9 +227,13 @@ function launch(account, { celebrate = false } = {}) {
     session.name = account.name || account.userId;
     store.setUser(session.userId);
   }
+  // The course decides which animal this is, so it has to be chosen before
+  // anything is drawn. A pack that names no mascot falls back to the one
+  // mapped to its language code, and failing that to the original bird.
+  setCreature(content.language?.code || null, content.mascot);
   if (!momo) {
-    $('momo').innerHTML = momoSvg('home');
-    momo = createMomo($('momo'), $('speech'), $('sparks'), screens.momoHooks);
+    $('momo').innerHTML = mascotSvg('home');
+    momo = createMascot($('momo'), $('speech'), $('sparks'), screens.momoHooks);
   }
   enterApp();
   if (celebrate) momo.speak('welcome');
@@ -237,9 +241,12 @@ function launch(account, { celebrate = false } = {}) {
 
 function enterApp() {
   buildTabs((f) => content.has(f), (screen) => {
+    // Today always works — it is the streak, the mascot and the board, none of
+    // which need a lesson. Everything else waits for content.
+    if (screen !== 'today' && underConstruction()) return screens.openBau();
     showScreen(screen);
     screens.RENDERERS[screen]?.();
-  });
+  }, content.icons);
   screens.initScreens(momo, session);
   screens.setSettingsHandlers({
     signOut: () => {
@@ -258,7 +265,12 @@ function enterApp() {
 // ── boot ────────────────────────────────────────────────────
 async function boot() {
   showPane('splash');
-  $('splashMomo').innerHTML = momoSvg('splash');
+  // The splash is painted before any pack exists, so the creature comes from
+  // whichever course this device last used. If that guess is wrong the pack
+  // corrects it a second later, which nobody will ever see.
+  const lastId = authLib.loadSession() || store.device.lastUser();
+  if (lastId) setCreature(authLib.localAccount(lastId)?.language || null, null);
+  $('splashMomo').innerHTML = mascotSvg('splash');
 
   const v = await readVersion();
   knownVersion = v?.version || null;
