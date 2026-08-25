@@ -1100,8 +1100,45 @@ button.setrow:active { border-color: var(--oro-d); background: var(--ceniza2); }
   position: absolute; inset: 0; display: flex; flex-direction: column;
   background: var(--basalt2);
 }
-.gm-hold {
-  flex: 1; min-height: 0; display: grid; place-items: center;
-  padding: 12px; background: #14100E;
+.gm-hold { flex: 1; min-height: 0; position: relative; background: #14100E; overflow: hidden; }
+.gm-hold canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+
+/* zoom, bottom right, out of the way of the thumb that is dragging */
+.gm-zoom {
+  position: absolute; right: 10px; bottom: 10px; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 4px 5px; border-radius: 12px;
+  background: rgba(20,16,14,.78); border: 1px solid var(--linea);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
-.gm-hold canvas { display: block; max-width: 100%; max-height: 100%; border-radius: 10px; }
+.gm-zoom button {
+  width: 30px; height: 30px; border: 0; border-radius: 9px; cursor: pointer;
+  background: none; color: var(--oro); font: inherit; font-size: 18px; line-height: 1;
+}
+.gm-zoom button:active { background: var(--ceniza); }
+.gm-zoom span {
+  font-size: 9.5px; letter-spacing: .06em; color: var(--txt3);
+  font-variant-numeric: tabular-nums;
+}
+.gm-clear {
+  position: absolute; left: 10px; bottom: 10px; z-index: 2;
+  padding: 8px 13px; border-radius: 12px; cursor: pointer;
+  background: rgba(20,16,14,.78); border: 1px solid var(--jade-d);
+  color: var(--jade); font: inherit; font-size: 12px;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.gm-clear:active { background: var(--ceniza); }
+
+/* the key — four dots, so the colours do not have to be guessed */
+.gm-key {
+  flex: none; display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: center;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--linea); background: var(--basalt2);
+  font-size: 11px; color: var(--txt3);
+}
+.gm-key span { display: flex; align-items: center; gap: 5px; }
+.gm-key i { width: 9px; height: 9px; border-radius: 50%; display: block; }
+.gm-key .k-quest { background: var(--oro); }
+.gm-key .k-done { background: rgba(52,179,150,.55); }
+.gm-key .k-you { background: var(--papel); }
+.gm-key .k-pin { background: var(--jade); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }

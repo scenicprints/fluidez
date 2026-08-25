@@ -254,7 +254,7 @@ export const settings = {
 // `heard` is the whole quest log. There are no map markers by design, so a
 // mission you have not been pointed at does not appear in the log at all —
 // you can still walk into it, it is simply not something you know about yet.
-const BLANK_GAME = { done: [], heard: [], spoke: [], seen: {}, at: null, track: null };
+const BLANK_GAME = { done: [], heard: [], spoke: [], seen: {}, at: null, track: null, pin: null };
 
 export const game = {
   all: () => ({ ...blank(BLANK_GAME), ...read('game', {}) }),
@@ -290,6 +290,13 @@ export const game = {
   },
   where(x, y) { const g = this.all(); g.at = { x, y }; this.save(g); },
   tracking(id) { const g = this.all(); g.track = id || null; this.save(g); },
+  /** A place on the map you dropped a pin on, in TILES. Null clears it. */
+  setPin(x, y) {
+    const g = this.all();
+    g.pin = (x === null || x === undefined) ? null : { x, y };
+    this.save(g);
+    return g.pin;
+  },
 };
 
 // ── the whole picture, for syncing ──────────────────────────

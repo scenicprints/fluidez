@@ -71,6 +71,13 @@ function shutOverlays() {
   if (panel) panel.innerHTML = '';
   if (log) log.classList.remove('on');
   if (map) map.classList.remove('on');
+  // The map view is module state like the stick is. Leaving the screen zoomed
+  // into one street and coming back to it later, with no memory of having done
+  // it, is disorienting — the map opens on the whole city the way it did the
+  // first time.
+  MAP.ready = false;
+  MPTR.clear();
+  mapDrag = null;
 }
 
 /**
@@ -129,6 +136,7 @@ export function start(pack) {
     world, painter, ctx, cv, raf: 0, ro: null,
     held: {}, minHold: {}, talking: false, npc: null, beat: 0, misses: 0,
     built: [], tray: [], track: saved.track || null, landed: false,
+    pin: saved.pin || null,
     VW: 0, VH: 0, SCALE: 1.35, t0: 0, lastSave: 0,
     savedAt: { x: Math.round(world.S.px), y: Math.round(world.S.py) },
   };
@@ -188,45 +196,68 @@ function frame(t) {
 // "you need to talk to people to find the precise place. You dont want the gps
 // to solve the puzzle for you. And when you exit the district that arrow pops
 // up again."
-function drawArrow(ctx) {
-  if (!G.track || G.talking) return;
-  const { world } = G;
-  const target = world.people.find((p) => p.id === G.track);
-  if (!target) return;
-  const d = world.districts[target.district];
-  if (!d) return;
+const dist = (m) => (m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m / 10) * 10 + ' m');
 
-  const px = world.S.px / TS, py = world.S.py / TS;
-  const away = Math.hypot(px - d.x, py - d.y);
-  if (away < d.r) return;                       // you are in it; find them yourself
-
-  const ang = Math.atan2(d.y - py, d.x - px);
-  // Below the HUD chip, not level with it. Centred at y 30 the banner ran from
-  // x 121 on a 390-wide phone and the HUD reaches 150, so the district name sat
-  // behind it — at the exact moment the arrow is the thing you are reading.
-  const cx = G.VW / 2, cy = 62;
-  const metres = Math.round(away * 5 / 10) * 10;
+/** One banner: a rotating arrow, a name and a distance. */
+function arrowBanner(ctx, row, ang, label, metres, colour) {
+  const cx = G.VW / 2, cy = 62 + row * 36;
   ctx.save();
   ctx.globalAlpha = 0.92;
   ctx.translate(cx, cy);
   ctx.fillStyle = 'rgba(20,16,14,.82)';
   ctx.beginPath(); ctx.roundRect(-74, -15, 148, 30, 15); ctx.fill();
-  ctx.strokeStyle = 'rgba(232,163,61,.5)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = colour + '80'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.roundRect(-74, -15, 148, 30, 15); ctx.stroke();
   ctx.save();
   ctx.translate(-52, 0); ctx.rotate(ang);
-  ctx.fillStyle = '#E8A33D';
+  ctx.fillStyle = colour;
   ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-6, -6); ctx.lineTo(-3, 0);
   ctx.lineTo(-6, 6); ctx.closePath(); ctx.fill();
   ctx.restore();
   ctx.fillStyle = '#EFE7DC';
   ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillText(DISTRICT_NAME[target.district] || target.district, -38, -4);
+  ctx.fillText(label, -38, -4);
   ctx.fillStyle = '#A99C8E'; ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText(metres >= 1000 ? (metres / 1000).toFixed(1) + ' km' : metres + ' m', -38, 8);
+  ctx.fillText(dist(metres), -38, 8);
   ctx.restore();
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+}
+
+// Two of them, and they are never the same colour.
+//
+// GOLD is the quest: it points at the DISTRICT and goes out once you are inside
+// it, because finding the actual person is meant to be done by asking somebody.
+// Kevin: "you need to talk to people to find the precise place. You dont want
+// the gps to solve the puzzle for you."
+//
+// JADE is your own pin, dropped by tapping the map, and it behaves the opposite
+// way on purpose — it points at the exact spot and keeps pointing until you are
+// standing on it. You put it there, so it is not solving anything for you.
+function drawArrow(ctx) {
+  if (!G || G.talking) return;
+  const { world } = G;
+  const px = world.S.px / TS, py = world.S.py / TS;
+  let row = 0;
+
+  if (G.track) {
+    const target = world.people.find((p) => p.id === G.track);
+    const d = target && world.districts[target.district];
+    if (d) {
+      const away = Math.hypot(px - d.x, py - d.y);
+      if (away >= d.r) {                    // inside it? find them yourself
+        arrowBanner(ctx, row++, Math.atan2(d.y - py, d.x - px),
+          DISTRICT_NAME[target.district] || target.district, away * 5, QUEST_COLOUR);
+      }
+    }
+  }
+
+  const pin = G.pin;
+  if (pin) {
+    const away = Math.hypot(px - pin.x, py - pin.y);
+    if (away > 4) arrowBanner(ctx, row++, Math.atan2(pin.y - py, pin.x - px),
+      'Your pin', away * 5, PIN_COLOUR);
+  }
 }
 
 // ── the HUD ─────────────────────────────────────────────────
@@ -344,51 +375,121 @@ function cityPicture(world) {
   return cv;
 }
 
+// How the map is being looked at. `z` is 1 when the whole city fits; the pan is
+// in tiles, so it survives the panel being a different size next time.
+const MAP = { z: 1, cx: 0, cy: 0, w: 0, h: 0, k0: 1, ready: false };
+const MAP_MAX = 14;
+const PIN_COLOUR = '#34B396';       // your pin, and its arrow. Never gold.
+const QUEST_COLOUR = '#E8A33D';     // a quest, everywhere in the game.
+
 function openMap() {
   if (!G) return;
-  const { world } = G;
-  const wrap = $('gameMap'), cv = $('gameMapCanvas');
+  const wrap = $('gameMap');
   wrap.classList.add('on');
+  if (!MAP.ready) {                 // first open: frame the whole city
+    MAP.z = 1;
+    MAP.cx = G.world.W / 2;
+    MAP.cy = G.world.H / 2;
+    MAP.ready = true;
+  }
+  paintMap();
+}
+function closeMap() { $('gameMap').classList.remove('on'); }
 
+/** Clamp the view so the city cannot be dragged off into the dark. */
+function mapClamp() {
+  const { world } = G;
+  const k = MAP.k0 * MAP.z;
+  const halfW = MAP.w / 2 / k, halfH = MAP.h / 2 / k;
+  // Once the city is smaller than the window in an axis, centre it in that axis.
+  MAP.cx = world.W * k <= MAP.w ? world.W / 2
+    : Math.max(halfW, Math.min(world.W - halfW, MAP.cx));
+  MAP.cy = world.H * k <= MAP.h ? world.H / 2
+    : Math.max(halfH, Math.min(world.H - halfH, MAP.cy));
+}
+
+function paintMap() {
+  if (!G || !$('gameMap').classList.contains('on')) return;
+  const { world } = G;
+  const cv = $('gameMapCanvas');
   const hold = cv.parentNode.getBoundingClientRect();
-  const scale = Math.min(hold.width / world.W, hold.height / world.H);
-  const w = Math.max(1, Math.round(world.W * scale));
-  const h = Math.max(1, Math.round(world.H * scale));
+  const w = Math.max(1, Math.round(hold.width)), h = Math.max(1, Math.round(hold.height));
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
   cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  MAP.w = w; MAP.h = h;
+  MAP.k0 = Math.min(w / world.W, h / world.H);
+  mapClamp();
 
   const g = cv.getContext('2d');
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.imageSmoothingEnabled = true;
   g.clearRect(0, 0, w, h);
-  g.drawImage(cityPicture(world), 0, 0, w, h);
 
-  const k = w / world.W;                    // tiles -> map pixels
+  const k = MAP.k0 * MAP.z;                       // tiles -> canvas pixels
+  const ox = w / 2 - MAP.cx * k, oy = h / 2 - MAP.cy * k;
+  const X = (tx) => tx * k + ox, Y = (ty) => ty * k + oy;
+  // Zoomed right in, the city should look like the tiles it is made of rather
+  // than a blur; zoomed out, smoothing is what stops it fizzing.
+  g.imageSmoothingEnabled = k < 1.5;
+  g.drawImage(cityPicture(world), ox, oy, world.W * k, world.H * k);
+
   const here = world.districtNow();
+  const saved = store.game.all();
+  const heard = new Set(saved.heard);
 
-  // A pin and a name for each district, not a circle round it.
-  //
-  // The circles were tried first and they are the wrong drawing: a district's
-  // radius is measured from how far apart its missions ended up, so Xalteva and
-  // La Terminal came out big enough to cover half of Granada while six others
-  // piled up on the same spot in the middle. What you want off this map is
-  // "Xalteva is west of me", and a dot says that better than a blob does.
+  // The district you are standing in, drawn at its real extent.
+  if (here && world.districts[here]) {
+    const d = world.districts[here];
+    g.beginPath(); g.arc(X(d.x), Y(d.y), Math.max(9, d.r * k), 0, 7);
+    g.fillStyle = 'rgba(244,233,214,.10)'; g.fill();
+    g.strokeStyle = 'rgba(244,233,214,.45)'; g.lineWidth = 1.2; g.stroke();
+  }
+
+  // ── the quest givers ──────────────────────────────────
+  // Kevin asked for these. The map was deliberately marker-free before —
+  // "you dont want the gps to solve the puzzle for you" — and he has changed
+  // his mind, which is his to change. Done ones go dim so the map reads as
+  // progress rather than as a to-do list.
+  const dot = k > 0.55 ? 4 : 3;
+  for (const p of world.people) {
+    if (p.crowd) continue;
+    const x = X(p.x), y = Y(p.y);
+    if (x < -8 || y < -8 || x > w + 8 || y > h + 8) continue;
+    const done = !!world.S.finished[p.id];
+    g.beginPath(); g.arc(x, y, done ? dot - 1 : dot, 0, 7);
+    g.fillStyle = done ? 'rgba(52,179,150,.55)'
+      : heard.has(p.id) ? QUEST_COLOUR : 'rgba(232,163,61,.5)';
+    g.fill();
+    g.lineWidth = 1.2; g.strokeStyle = 'rgba(16,13,11,.8)'; g.stroke();
+  }
+
+  // Their names, but only once you are close enough in for it to be readable.
+  if (k > 1.6) {
+    g.font = '600 9px ui-sans-serif, system-ui, sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const p of world.people) {
+      if (p.crowd || world.S.finished[p.id]) continue;
+      const x = X(p.x), y = Y(p.y) - 9;
+      if (x < 0 || y < 0 || x > w || y > h) continue;
+      g.lineWidth = 3; g.strokeStyle = 'rgba(16,13,11,.92)';
+      g.strokeText(p.name, x, y);
+      g.fillStyle = '#F0D9A8'; g.fillText(p.name, x, y);
+    }
+  }
+
+  // ── district names ────────────────────────────────────
   const pins = Object.keys(world.districts).map((key) => {
     const d = world.districts[key];
-    return { key, name: DISTRICT_NAME[key] || key, x: d.x * k, y: d.y * k, mine: key === here };
+    return { key, name: DISTRICT_NAME[key] || key, x: X(d.x), y: Y(d.y), mine: key === here };
   }).sort((a, b) => a.y - b.y);
 
-  // Twelve names on a phone-sized city will collide, so each label is nudged
-  // clear of the ones already placed instead of being drawn on top of them.
   g.font = '600 10px ui-sans-serif, system-ui, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
   const placed = [];
   for (const p of pins) {
     const half = g.measureText(p.name).width / 2 + 3;
-    // Kept inside the canvas: Afuera and El Malecón sit close to the west and
-    // east edges of the city, and a name centred on the pin would hang off it.
     p.lx = Math.max(half + 2, Math.min(w - half - 2, p.x));
-    let ly = p.y - 9;
+    let ly = p.y - 11;
     for (let i = 0; i < 40; i++) {
       const clash = placed.some((q) => Math.abs(q.y - ly) < 11 && Math.abs(q.lx - p.lx) < q.half + half);
       if (!clash) break;
@@ -396,47 +497,147 @@ function openMap() {
     }
     p.ly = ly;
     placed.push({ lx: p.lx, y: ly, half });
-  }
-
-  // The district you are standing in gets its actual extent drawn, because
-  // "am I there yet" is the one question the shape genuinely answers — it is
-  // the same radius the arrow switches off inside.
-  if (here && world.districts[here]) {
-    const d = world.districts[here];
-    g.beginPath(); g.arc(d.x * k, d.y * k, Math.max(9, d.r * k), 0, 7);
-    g.fillStyle = 'rgba(52,179,150,.13)'; g.fill();
-    g.strokeStyle = 'rgba(52,179,150,.6)'; g.lineWidth = 1.2; g.stroke();
-  }
-
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  for (const p of pins) {
-    g.beginPath(); g.arc(p.x, p.y, p.mine ? 4 : 3, 0, 7);
-    g.fillStyle = p.mine ? '#34B396' : '#E8A33D';
-    g.fill();
-    g.lineWidth = 1.4; g.strokeStyle = 'rgba(16,13,11,.85)'; g.stroke();
-    // A dark rim under the text: the city beneath it is every colour, and a
-    // plain label disappears over the roofs.
+    if (p.ly < -10 || p.ly > h + 10) continue;
     g.lineWidth = 3; g.strokeStyle = 'rgba(16,13,11,.92)';
     g.strokeText(p.name, p.lx, p.ly);
-    g.fillStyle = p.mine ? '#7FE0C6' : '#F0D9A8';
+    g.fillStyle = p.mine ? '#FFF3DC' : '#E0CBA4';
     g.fillText(p.name, p.lx, p.ly);
   }
-
-  // You.
-  const px = (world.S.px / TS) * k, py = (world.S.py / TS) * k;
-  g.beginPath(); g.arc(px, py, 5.5, 0, 7);
-  g.fillStyle = 'rgba(244,233,214,.35)'; g.fill();
-  g.beginPath(); g.arc(px, py, 2.8, 0, 7);
-  g.fillStyle = '#F4E9D6'; g.fill();
-  g.lineWidth = 1.4; g.strokeStyle = '#14100E'; g.stroke();
   g.textAlign = 'left'; g.textBaseline = 'alphabetic';
 
-  $('gameMapSub').textContent = here
-    ? `You are in ${DISTRICT_NAME[here] || here}.`
-    : 'You are out between the districts.';
+  // ── your pin ──────────────────────────────────────────
+  if (saved.pin) drawPinMark(g, X(saved.pin.x), Y(saved.pin.y));
+
+  // ── you ───────────────────────────────────────────────
+  const px = X(world.S.px / TS), py = Y(world.S.py / TS);
+  g.beginPath(); g.arc(px, py, 6.5, 0, 7);
+  g.fillStyle = 'rgba(244,233,214,.30)'; g.fill();
+  g.beginPath(); g.arc(px, py, 3.2, 0, 7);
+  g.fillStyle = '#F4E9D6'; g.fill();
+  g.lineWidth = 1.5; g.strokeStyle = '#14100E'; g.stroke();
+
+  paintMapChrome(here, saved.pin);
 }
-function closeMap() { $('gameMap').classList.remove('on'); }
+
+/** A teardrop, so the pin is a different SHAPE as well as a different colour. */
+function drawPinMark(g, x, y) {
+  g.save();
+  g.beginPath();
+  g.moveTo(x, y);
+  g.lineTo(x - 5, y - 9);
+  g.arc(x, y - 13, 5.2, Math.PI * 0.78, Math.PI * 0.22, false);
+  g.closePath();
+  g.fillStyle = PIN_COLOUR; g.fill();
+  g.lineWidth = 1.4; g.strokeStyle = 'rgba(16,13,11,.9)'; g.stroke();
+  g.beginPath(); g.arc(x, y - 13, 1.9, 0, 7);
+  g.fillStyle = '#0E1E1A'; g.fill();
+  g.restore();
+}
+
+function paintMapChrome(here, pin) {
+  const where = here ? `You are in ${DISTRICT_NAME[here] || here}.` : 'You are out between the districts.';
+  $('gameMapSub').textContent = pin
+    ? `${where} Tap to move your pin.`
+    : `${where} Tap anywhere to drop a pin.`;
+  const clear = $('gameMapClear');
+  if (clear && clear.style) clear.style.display = pin ? '' : 'none';
+  const zl = $('gameMapZoom');
+  if (zl) zl.textContent = MAP.z <= 1.02 ? 'Granada' : `${MAP.z.toFixed(1)}x`;
+}
+
+function mapZoom(mult, atX, atY) {
+  const before = MAP.k0 * MAP.z;
+  const z = Math.max(1, Math.min(MAP_MAX, MAP.z * mult));
+  if (z === MAP.z) return;
+  // Keep whatever is under the fingers under the fingers.
+  if (atX !== undefined) {
+    const tx = MAP.cx + (atX - MAP.w / 2) / before;
+    const ty = MAP.cy + (atY - MAP.h / 2) / before;
+    MAP.z = z;
+    const after = MAP.k0 * MAP.z;
+    MAP.cx = tx - (atX - MAP.w / 2) / after;
+    MAP.cy = ty - (atY - MAP.h / 2) / after;
+  } else {
+    MAP.z = z;
+  }
+  paintMap();
+}
+
+/** The pin lives in two places: on disk, and on the running game for the arrow. */
+function dropPin(x, y) {
+  const pin = store.game.setPin(x, y);
+  if (G) G.pin = pin;
+  paintMap();
+}
+
+/** Where in the city is this point on the canvas? */
+function mapToTile(cx, cy) {
+  const k = MAP.k0 * MAP.z;
+  return { x: MAP.cx + (cx - MAP.w / 2) / k, y: MAP.cy + (cy - MAP.h / 2) / k };
+}
+
+// Drag to pan, pinch or wheel to zoom, and a tap that did not drag drops the
+// pin. One pointer map for both, because a pinch is two of the same gesture.
+const MPTR = new Map();
+let mapDrag = null;
+
+function mapDown(e) {
+  if (!G) return;
+  const r = $('gameMapCanvas').getBoundingClientRect();
+  MPTR.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
+  if (MPTR.size === 1) {
+    const p = MPTR.get(e.pointerId);
+    mapDrag = { x: p.x, y: p.y, x0: p.x, y0: p.y, moved: 0 };
+  } else {
+    mapDrag = null;                    // a second finger is a pinch, not a tap
+  }
+  const cv = $('gameMapCanvas');
+  if (cv.setPointerCapture) { try { cv.setPointerCapture(e.pointerId); } catch {} }
+  if (e.preventDefault) e.preventDefault();
+}
+
+function mapMove(e) {
+  if (!G || !MPTR.has(e.pointerId)) return;
+  const r = $('gameMapCanvas').getBoundingClientRect();
+  const now = { x: e.clientX - r.left, y: e.clientY - r.top };
+  const was = MPTR.get(e.pointerId);
+  const pts = [...MPTR.values()];
+
+  if (MPTR.size >= 2) {
+    const other = pts.find((p) => p !== was) || pts[0];
+    const dBefore = Math.hypot(was.x - other.x, was.y - other.y);
+    const dAfter = Math.hypot(now.x - other.x, now.y - other.y);
+    MPTR.set(e.pointerId, now);
+    if (dBefore > 4 && dAfter > 4) {
+      mapZoom(dAfter / dBefore, (now.x + other.x) / 2, (now.y + other.y) / 2);
+    }
+    return;
+  }
+
+  MPTR.set(e.pointerId, now);
+  if (!mapDrag) return;
+  const k = MAP.k0 * MAP.z;
+  MAP.cx -= (now.x - mapDrag.x) / k;
+  MAP.cy -= (now.y - mapDrag.y) / k;
+  mapDrag.moved += Math.abs(now.x - mapDrag.x) + Math.abs(now.y - mapDrag.y);
+  mapDrag.x = now.x; mapDrag.y = now.y;
+  paintMap();
+}
+
+function mapUp(e) {
+  if (!MPTR.has(e.pointerId)) { MPTR.clear(); mapDrag = null; return; }
+  const p = MPTR.get(e.pointerId);
+  MPTR.delete(e.pointerId);
+  // A tap is a press that went nowhere. Dragging the map must never drop a pin
+  // somewhere you did not mean, so the threshold is generous.
+  if (G && mapDrag && MPTR.size === 0 && mapDrag.moved < 8) {
+    const t = mapToTile(p.x, p.y);
+    if (t.x >= 0 && t.y >= 0 && t.x < G.world.W && t.y < G.world.H) {
+      dropPin(Math.round(t.x), Math.round(t.y));
+    }
+  }
+  mapDrag = null;
+}
 
 // ── talking ─────────────────────────────────────────────────
 function tryTalk() {
@@ -714,6 +915,27 @@ function wireControls() {
   $('gameLogClose').addEventListener('click', closeLog);
   $('gameMapBtn').addEventListener('click', openMap);
   $('gameMapClose').addEventListener('click', closeMap);
+  $('gameMapClear').addEventListener('click', () => dropPin(null, null));
+  $('gameMapIn').addEventListener('click', () => mapZoom(1.6));
+  $('gameMapOut').addEventListener('click', () => mapZoom(1 / 1.6));
+
+  const mcv = $('gameMapCanvas');
+  if (mcv) {
+    mcv.addEventListener('pointerdown', mapDown);
+    mcv.addEventListener('pointermove', mapMove);
+    mcv.addEventListener('pointerup', mapUp);
+    mcv.addEventListener('pointercancel', mapUp);
+    mcv.addEventListener('lostpointercapture', mapUp);
+    // Without this the browser pans the page instead of the map, and a
+    // long press offers to save the canvas as an image.
+    mcv.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    mcv.addEventListener('wheel', (e) => {
+      if (!G) return;
+      e.preventDefault();
+      const r = mcv.getBoundingClientRect();
+      mapZoom(e.deltaY < 0 ? 1.18 : 1 / 1.18, e.clientX - r.left, e.clientY - r.top);
+    }, { passive: false });
+  }
 
   // Long-pressing a d-pad button offered to copy the arrow out of it. The CSS
   // stops iOS showing its callout; this stops Android and desktop raising a
@@ -758,4 +980,7 @@ function wireControls() {
     if (document.visibilityState === 'hidden') { saveWhere(true); stickEnd(); }
   });
   addEventListener('pagehide', () => { saveWhere(true); stickEnd(); });
+  // The map sizes itself to the panel when it is painted, so a rotate with it
+  // open would leave the city drawn for the old shape until you touched it.
+  addEventListener('resize', () => { if (G) paintMap(); });
 }

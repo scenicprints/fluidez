@@ -47,27 +47,41 @@ const world = createWorld({ missions, crowd });
 const { W, H, grid, districts, S } = world;
 
 // The panel is about 360 px wide on a phone; the canvas fits inside it.
-const OUT_W = 360, k = OUT_W / W, OUT_H = Math.round(H * k);
+// A second argument zooms, the way the map's + button does, centred on the
+// player — so you can see what the quest dots and their names look like when
+// somebody has actually pinched in, not just the whole-city view.
+const ZOOM = Number(process.argv[3] || 1);
+const OUT_W = 360, OUT_H = Math.round(885 * (OUT_W / 1089));
 const px = new Uint8Array(OUT_W * OUT_H * 3).fill(20);
 const hex = (h) => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
 const CACHE = {};
 for (const key of Object.keys(MAP_COLOUR)) CACHE[key] = hex(MAP_COLOUR[key]);
 const FALLBACK = hex('#2A241F');
 
+// tiles -> output pixels, and where the view is centred, exactly as paintMap.
+const k0 = Math.min(OUT_W / W, OUT_H / H);
+const k = k0 * ZOOM;
+const cx = ZOOM > 1 ? S.px / TS : W / 2;
+const cy = ZOOM > 1 ? S.py / TS : H / 2;
+const oxOff = OUT_W / 2 - cx * k, oyOff = OUT_H / 2 - cy * k;
+const X = (tx) => tx * k + oxOff, Y = (ty) => ty * k + oyOff;
+
 // Area-average the tiles that fall in each output pixel — which is what the
 // browser's smoothed drawImage does when it shrinks the city.
 for (let oy = 0; oy < OUT_H; oy++) {
-  const y0 = Math.floor(oy / k), y1 = Math.min(H, Math.floor((oy + 1) / k));
+  const y0 = Math.floor((oy - oyOff) / k), y1 = Math.floor((oy + 1 - oyOff) / k);
   for (let ox = 0; ox < OUT_W; ox++) {
-    const x0 = Math.floor(ox / k), x1 = Math.min(W, Math.floor((ox + 1) / k));
+    const x0 = Math.floor((ox - oxOff) / k), x1 = Math.floor((ox + 1 - oxOff) / k);
     let r = 0, g = 0, b = 0, n = 0;
     for (let y = y0; y < Math.max(y1, y0 + 1); y++) {
       for (let x = x0; x < Math.max(x1, x0 + 1); x++) {
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
         const c = CACHE[grid[y * W + x]] || FALLBACK;
         r += c[0]; g += c[1]; b += c[2]; n++;
       }
     }
     const i = (oy * OUT_W + ox) * 3;
+    if (!n) { px[i] = 20; px[i+1] = 16; px[i+2] = 14; continue; }
     px[i] = r / n; px[i+1] = g / n; px[i+2] = b / n;
   }
 }
@@ -100,8 +114,15 @@ const NAME = {
 };
 // Mirrors the label placement in openMap so the collisions are visible here.
 const CHAR = 5.4;   // ~10px semibold sans, average advance
+// A dot for every quest giver, the way paintMap does it.
+const dotR = k > 0.55 ? 4 : 3;
+for (const p of world.people) {
+  if (p.crowd) continue;
+  disc(X(p.x), Y(p.y), dotR, GOLD, 0.85);
+}
+
 const pins = Object.keys(districts).map((key) => ({
-  key, name: NAME[key] || key, x: districts[key].x * k, y: districts[key].y * k,
+  key, name: NAME[key] || key, x: X(districts[key].x), y: Y(districts[key].y),
 })).sort((a, b) => a.y - b.y);
 const placed = [];
 for (const p of pins) {
@@ -117,10 +138,14 @@ for (const p of pins) {
 for (const p of pins) {
   // the label box, so overlap is obvious to the eye
   for (let y = -5; y <= 5; y++) for (let x = -p.half; x <= p.half; x++) put(p.x + x, p.ly + y, CREAM, 0.55);
-  disc(p.x, p.y, 3, GOLD, 1);
-  console.log(`  ${p.key.padEnd(10)} pin ${p.x.toFixed(0).padStart(3)},${p.y.toFixed(0).padStart(3)}  label y ${p.ly.toFixed(0)} (moved ${(p.ly - (p.y - 9)).toFixed(0)})`);
+  console.log(`  ${p.key.padEnd(10)} label at ${p.x.toFixed(0).padStart(4)},${p.ly.toFixed(0).padStart(4)} (moved ${(p.ly - (p.y - 9)).toFixed(0)})`);
 }
-disc((S.px / TS) * k, (S.py / TS) * k, 3, CREAM, 1);
+// You, and a dropped pin two hundred metres north-east of you.
+disc(X(S.px / TS), Y(S.py / TS), 4, CREAM, 1);
+const pinAt = { x: S.px / TS + 40, y: S.py / TS - 30 };
+disc(X(pinAt.x), Y(pinAt.y) - 13, 5, JADE, 1);
+for (let i = 0; i < 13; i++) disc(X(pinAt.x), Y(pinAt.y) - i, Math.max(1, 4 - i / 3), JADE, 1);
+console.log(`\nzoom ${ZOOM}x, ${(1 / k * 5).toFixed(1)} m per pixel`);
 
 // PNG
 const raw = Buffer.alloc((OUT_W * 3 + 1) * OUT_H);

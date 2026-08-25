@@ -249,18 +249,32 @@
 
       <div class="prompt" id="gamePrompt"></div>
 
-      <!-- The city, and the twelve districts in it. No mission markers: where
-           somebody actually IS is what the street is for. -->
+      <!-- The city, its districts, and every quest giver in it. Drag to move,
+           pinch or use the buttons to zoom, tap to drop a pin. -->
       <div class="gamemap" id="gameMap">
         <div class="gm-panel">
           <div class="gl-top">
             <div>
               <div class="gl-title">Granada</div>
-              <div class="gl-sub" id="gameMapSub">The whole city. Districts are where the people are — the street tells you the rest.</div>
+              <div class="gl-sub" id="gameMapSub">Tap anywhere to drop a pin.</div>
             </div>
             <button class="iconbtn" id="gameMapClose" type="button" aria-label="Close">✕</button>
           </div>
-          <div class="gm-hold"><canvas id="gameMapCanvas"></canvas></div>
+          <div class="gm-hold">
+            <canvas id="gameMapCanvas"></canvas>
+            <div class="gm-zoom">
+              <button id="gameMapIn" type="button" aria-label="Zoom in">+</button>
+              <span id="gameMapZoom">Granada</span>
+              <button id="gameMapOut" type="button" aria-label="Zoom out">−</button>
+            </div>
+            <button class="gm-clear" id="gameMapClear" type="button" style="display:none">Clear pin</button>
+          </div>
+          <div class="gm-key">
+            <span><i class="k-quest"></i>To do</span>
+            <span><i class="k-done"></i>Done</span>
+            <span><i class="k-you"></i>You</span>
+            <span><i class="k-pin"></i>Your pin</span>
+          </div>
         </div>
       </div>
 

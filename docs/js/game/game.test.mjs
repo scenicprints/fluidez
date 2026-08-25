@@ -33,7 +33,9 @@ const test = (name, fn) => {
 
 // ── a browser, more or less ─────────────────────────────────
 const drew = { fillRect: 0, drawImage: 0, arc: 0, fillText: 0, roundRect: 0 };
-const ctx2d = () => new Proxy({}, {
+// Every colour the code paints with, in order. Checking that two things are
+// drawn in two different colours is otherwise impossible from here.
+const ctx2d = (paints) => new Proxy({}, {
   get(t, k) {
     if (k in drew) return () => { drew[k]++; };
     if (k === 'measureText') return () => ({ width: 10 });
@@ -43,7 +45,11 @@ const ctx2d = () => new Proxy({}, {
     if (k === 'getImageData') return (x, y, w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
     return t[k] === undefined ? () => {} : t[k];
   },
-  set(t, k, v) { t[k] = v; return true; },
+  set(t, k, v) {
+    if ((k === 'fillStyle' || k === 'strokeStyle') && paints) paints.push(String(v));
+    t[k] = v;
+    return true;
+  },
 });
 const nodes = new Map();
 
@@ -56,7 +62,8 @@ const nodes = new Map();
 const TILE = /<button[^>]*data-id="(\d+)"[^>]*>([\s\S]*?)<\/button>/g;
 const makeEl = (id) => {
   const listeners = {};
-  let html = '', kids = null;
+  const paints = [];
+  let html = '', kids = null, ctx = null;
   const children = () => {
     if (kids) return kids;
     kids = [];
@@ -86,7 +93,10 @@ const makeEl = (id) => {
     getBoundingClientRect: () => (id === 'gameStick'
       ? { left: 20, top: 600, width: 132, height: 132, right: 152, bottom: 732 }
       : { left: 0, top: 0, width: 390, height: 560, right: 390, bottom: 560 }),
-    getContext: () => ctx2d(),
+    // One context per element, kept — the code holds on to the one it is given,
+    // so handing out a fresh proxy each call would lose everything it painted.
+    paints,
+    getContext: () => (ctx || (ctx = ctx2d(paints))),
     addEventListener: (ev, fn) => { (listeners[ev] || (listeners[ev] = [])).push(fn); },
     querySelectorAll: () => children(),
     appendChild() {}, removeChild() {}, focus() {},
@@ -668,6 +678,134 @@ test('the map does not survive leaving the screen either', () => {
   document.getElementById('gameMapBtn').fire('click');
   screen.stop();
   assert.ok(!document.getElementById('gameMap').classList.contains('on'));
+});
+
+// ── zoom, pan and the pin ───────────────────────────────────
+const mapCv = () => document.getElementById('gameMapCanvas');
+const openTheMap = (user) => {
+  store.setUser(user);
+  screen.start({ missions, crowd });
+  document.getElementById('gameMapBtn').fire('click');
+};
+
+test('the map zooms in and back out again, and stops at the whole city', () => {
+  openTheMap('zoom');
+  const label = document.getElementById('gameMapZoom');
+  assert.equal(label.textContent, 'Granada', 'did not open showing the whole city');
+
+  document.getElementById('gameMapIn').fire('click');
+  assert.notEqual(label.textContent, 'Granada', 'zooming in did nothing');
+  const zoomed = label.textContent;
+
+  for (let i = 0; i < 12; i++) document.getElementById('gameMapOut').fire('click');
+  assert.equal(label.textContent, 'Granada', 'zoomed out past the whole city');
+  // And it really stopped at 1, rather than shrinking away below it: one step
+  // back in from a properly clamped view is exactly 1.6x. If zooming out had
+  // been allowed to run down to a fraction, this would still read "Granada".
+  document.getElementById('gameMapIn').fire('click');
+  assert.equal(label.textContent, '1.6x',
+    `zoom-out ran past the whole city — one step back in gave ${label.textContent}`);
+  document.getElementById('gameMapOut').fire('click');
+
+  for (let i = 0; i < 30; i++) document.getElementById('gameMapIn').fire('click');
+  const max = parseFloat(label.textContent);
+  assert.ok(max <= 14.001, `zoomed to ${max}x, past the limit`);
+  assert.ok(max > parseFloat(zoomed), 'zoom did not keep going in');
+});
+
+test('dragging the map moves it and does NOT drop a pin', () => {
+  openTheMap('pan');
+  document.getElementById('gameMapIn').fire('click');   // zoomed in, so panning has room
+  const cv = mapCv();
+  const before = store.game.all().pin;
+  cv.fire('pointerdown', { pointerId: 1, clientX: 200, clientY: 200 });
+  cv.fire('pointermove', { pointerId: 1, clientX: 140, clientY: 160 });
+  cv.fire('pointermove', { pointerId: 1, clientX: 90, clientY: 120 });
+  cv.fire('pointerup', { pointerId: 1, clientX: 90, clientY: 120 });
+  assert.deepEqual(store.game.all().pin, before, 'a drag dropped a pin');
+});
+
+test('a tap drops a pin, and the pin survives leaving and coming back', () => {
+  openTheMap('pin');
+  const cv = mapCv();
+  cv.fire('pointerdown', { pointerId: 1, clientX: 150, clientY: 180 });
+  cv.fire('pointerup', { pointerId: 1, clientX: 150, clientY: 180 });
+
+  const pin = store.game.all().pin;
+  assert.ok(pin, 'tapping the map dropped nothing');
+  assert.ok(Number.isFinite(pin.x) && Number.isFinite(pin.y), `pin is ${JSON.stringify(pin)}`);
+  assert.ok(pin.x >= 0 && pin.x < world.W && pin.y >= 0 && pin.y < world.H, 'pin is off the map');
+
+  screen.stop();
+  screen.start({ missions, crowd });
+  assert.deepEqual(store.game.all().pin, pin, 'the pin did not survive');
+});
+
+test('the pin can be cleared', () => {
+  openTheMap('unpin');
+  const cv = mapCv();
+  cv.fire('pointerdown', { pointerId: 1, clientX: 120, clientY: 140 });
+  cv.fire('pointerup', { pointerId: 1, clientX: 120, clientY: 140 });
+  assert.ok(store.game.all().pin, 'no pin to clear');
+  document.getElementById('gameMapClear').fire('click');
+  assert.equal(store.game.all().pin, null, 'Clear pin left it there');
+});
+
+// The banner outline, which only an arrow banner ever paints. The flat colours
+// are no good for this: the player's own shirt is jade, so looking for #34B396
+// on the game canvas finds him standing there whether or not a pin exists.
+const QUEST_GOLD = '#E8A33D', PIN_JADE = '#34B396';
+const QUEST_BANNER = QUEST_GOLD + '80', PIN_BANNER = PIN_JADE + '80';
+
+test('the quest arrow is gold and your pin arrow is not', () => {
+  // Kevin asked for the pin arrow "in a different color than the quest gps".
+  // Both are the same banner drawn twice, so getting this wrong is one edit
+  // away at all times.
+  store.setUser('arrows');
+  const far = missions.find((m) => m.district === 'malecon') || missions[0];
+  store.game.hear([far.id]);
+  store.game.tracking(far.id);
+  store.game.setPin(300, 300);
+  screen.start({ missions, crowd });
+
+  const w = screen.__test.world();
+  assert.ok(Math.hypot(w.S.px / TS - 300, w.S.py / TS - 300) > 4,
+    'standing on the pin, so its arrow would be hidden');
+
+  const paints = document.getElementById('gameCanvas').paints;
+  paints.length = 0;
+  screen.__test.frame(16);
+
+  assert.ok(paints.includes(QUEST_BANNER), 'no gold quest arrow was drawn');
+  assert.ok(paints.includes(PIN_BANNER), 'no pin arrow was drawn');
+  assert.notEqual(QUEST_BANNER, PIN_BANNER, 'the two arrows are the same colour');
+});
+
+test('the pin arrow goes out once you are standing on it', () => {
+  store.setUser('arrived');
+  screen.start({ missions, crowd });
+  const w = screen.__test.world();
+  store.game.setPin(Math.round(w.S.px / TS), Math.round(w.S.py / TS));
+  screen.stop();
+  screen.start({ missions, crowd });
+
+  const paints = document.getElementById('gameCanvas').paints;
+  paints.length = 0;
+  screen.__test.frame(16);
+  assert.ok(!paints.includes(PIN_BANNER), 'the pin arrow is still pointing at your feet');
+});
+
+test('the map shows a dot for every quest giver', () => {
+  store.setUser('dots');
+  screen.start({ missions, crowd });
+  const paints = document.getElementById('gameMapCanvas').paints;
+  paints.length = 0;
+  document.getElementById('gameMapBtn').fire('click');
+  // Gold for a mission you have been told about, faded gold for one you have
+  // not, jade for one already done.
+  const gold = paints.filter((c) => c === QUEST_GOLD || c === 'rgba(232,163,61,.5)').length;
+  assert.ok(gold >= missions.length,
+    `${gold} quest dots drawn for ${missions.length} missions`);
 });
 
 test('game progress rides along with the cloud snapshot', () => {

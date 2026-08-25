@@ -264,13 +264,39 @@ The first attempt had eighteen of them over a 1250 px radius, which is 0.4 of a
 person on screen and still read as deserted. **Set the count from the area, not
 by eye.**
 
-**There is a map, and it deliberately does not tell you where anybody is.**
-Kevin asked for *"a map I can pop up so I can see what the city looks like and
-know where to go and where the districts are"*. It is the button under the HUD:
-the whole city painted from the tile grid, a pin and a name for each of the
-twelve districts, and you. **No mission markers** — same reason the arrow
-switches off at the district boundary. Knowing Xalteva is west of you is
-geography; knowing which doorway is the answer.
+**There is a map.** Kevin asked for *"a map I can pop up so I can see what the
+city looks like and know where to go and where the districts are"*. It is the
+button under the HUD: the whole city painted from the tile grid, a name for each
+of the twelve districts, every quest giver, you, and a pin you drop yourself.
+Drag to move it, pinch or use the buttons to zoom (1x to 14x), tap to drop the
+pin, and there is a key along the bottom.
+
+**The map now DOES show where everybody is, and that is a change Kevin made.**
+It was deliberately marker-free at first, for the reason the arrow still stops
+at the district boundary — *"you dont want the gps to solve the puzzle for
+you."* He then asked for *"dots for quest givers"* outright. It is his call and
+it is made; do not quietly put the old rule back. Dots are gold for a mission
+you have been told about, faded gold for one you have not, jade for one already
+done, and their names appear once you are zoomed past about 1.6x.
+
+**Two arrows, and they are never the same colour.** Kevin: *"be able to set a
+pin and the gps 'in a different color than the quest gps' shows you the arrow of
+where to go."* So:
+
+| | colour | points at | goes out when |
+|---|---|---|---|
+| quest | **gold** `#E8A33D` | the DISTRICT of the mission you are following | you are inside that district |
+| your pin | **jade** `#34B396` | the exact tile you tapped | you are standing on it |
+
+They behave in opposite ways **on purpose**. The quest arrow stops at the
+boundary because finding the person is meant to be done by asking. The pin
+arrow goes all the way, because you chose the spot yourself — it is not solving
+anything you did not already know. The pin is a teardrop rather than a dot, so
+it differs in shape as well as colour, and it survives leaving the screen.
+
+The map view itself (zoom and pan) is module state like the thumbstick, and
+`stop()` resets it — coming back to a map still zoomed into one street, with no
+memory of having done that, is disorienting.
 
 Districts are drawn as **pins, not circles**. Circles were tried first and are
 the wrong drawing: a district's radius is measured from how far apart its
@@ -389,10 +415,11 @@ checking the suite goes red. If you fix something here, do that.
 photographed from here:
 
 ```bash
-node mockups/mappng.mjs out/map.png     # then open it
+node mockups/mappng.mjs out/wide.png       # the whole city
+node mockups/mappng.mjs out/close.png 5    # zoomed 5x on the player
 ```
 
-It draws the city the way `openMap` does, reading the colour table straight out
+It draws the city the way `paintMap` does, reading the colour table straight out
 of `screen.js` so it cannot drift. That is what caught the first version of the
 map, where the district circles covered half of Granada and half the labels sat
 on top of each other. Green tests would never have told you.
