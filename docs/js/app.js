@@ -3,7 +3,7 @@
 // Order matters here: get something on screen fast, decide whether this is a
 // first run or a returning one, and never block the app on the network.
 
-import { $, showScreen, showPane, buildTabs, toast, onScreen } from './ui.js';
+import { $, showScreen, showPane, buildTabs, toast, onScreen, screenNow } from './ui.js';
 import * as store from './store.js';
 import * as authLib from './auth.js';
 import * as cloud from './cloud.js';
@@ -362,6 +362,13 @@ onScreen(async (id) => {
     if (!content.has('game')) return;
     try {
       if (!gameMod) gameMod = await import('./game/screen.js');
+      // That import is half a megabyte and the first one is the slow one. Tap
+      // Granada and tap away again before it lands and the `else` below ran
+      // while gameMod was still null — so nothing stopped anything, and then
+      // the whole world started up inside a hidden section: a 0x0 canvas with
+      // a full frame loop and the traffic running behind it, invisibly, until
+      // the next screen change. Ask again now that we are back.
+      if (screenNow() !== 'game') return;
       gameMod.start(content.game);
     } catch (e) {
       console.error(e);

@@ -241,7 +241,28 @@
         <svg class="gh-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
       </button>
 
+      <button class="gamemapbtn" id="gameMapBtn" type="button" aria-label="Map of Granada">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Zm0 0v14m6-12v14" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+      </button>
+
       <div class="prompt" id="gamePrompt"></div>
+
+      <!-- The city, and the twelve districts in it. No mission markers: where
+           somebody actually IS is what the street is for. -->
+      <div class="gamemap" id="gameMap">
+        <div class="gm-panel">
+          <div class="gl-top">
+            <div>
+              <div class="gl-title">Granada</div>
+              <div class="gl-sub" id="gameMapSub">The whole city. Districts are where the people are — the street tells you the rest.</div>
+            </div>
+            <button class="iconbtn" id="gameMapClose" type="button" aria-label="Close">✕</button>
+          </div>
+          <div class="gm-hold"><canvas id="gameMapCanvas"></canvas></div>
+        </div>
+      </div>
 
       <!-- the quest log -->
       <div class="gamelog" id="gameLog">

@@ -129,7 +129,10 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
   const map = loadMap();
   const { W, H, grid, tint } = map;
   const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? WALL : grid[y * W + x];
-  const spot = (name) => map.spots.find((s) => s.n.indexOf(name) === 0);
+  // An empty name used to match the FIRST spot in the list, so a mission with a
+  // district nobody recognises was silently placed at whatever spot 0 happened
+  // to be instead of falling through to the fallback below it.
+  const spot = (name) => (name ? map.spots.find((s) => s.n.indexOf(name) === 0) : null);
 
   function walkable(tx, ty) {
     for (let r = 0; r < 60; r++) {
@@ -165,6 +168,22 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
     }
     return seen;
   })();
+
+  /**
+   * Is this pixel position somewhere you could actually be standing?
+   *
+   * The saved position is handed straight back to you on resume, and the map is
+   * regenerated whenever the city is rebuilt — so the spot you logged off in can
+   * come back as the inside of a wall. Every direction then fails `canGo` and
+   * you are frozen for good, with a stick that still works. The screen checks
+   * this and drops you back at the start rather than into a wall.
+   */
+  function canStand(px, py) {
+    if (!Number.isFinite(px) || !Number.isFinite(py)) return false;
+    const tx = Math.floor(px / TS), ty = Math.floor(py / TS);
+    if (tx < 1 || ty < 1 || tx >= W - 1 || ty >= H - 1) return false;
+    return !!REACH[ty * W + tx];
+  }
 
   const taken = new Set([START.x + ',' + START.y]);
   function standing(tx, ty) {
@@ -244,8 +263,89 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
   const S = {
     px: START.x * TS + 8, py: START.y * TS + 8, dir: 0, step: 0, moving: false,
     finished: { ...finished },
-    traffic: [],
+    traffic: [], walkers: [],
   };
+
+  // ── street life ─────────────────────────────────────────
+  // Granada is 1089 x 885 tiles and the 248 people who have something to say
+  // stand in twelve tight knots inside it. Walk out of one and the city is
+  // 2,000 screenfuls of empty street with cars on it — which is exactly what it
+  // felt like. These are the people who are just going somewhere.
+  //
+  // They are deliberately NOT talkable, and they carry no bubble. The rule the
+  // game already teaches is "a bubble means somebody has something to say", so
+  // a passer-by without one is unambiguous rather than a disappointment. They
+  // do not block you either: being body-checked by scenery is worse than empty
+  // streets. `nearest()` only ever looks at `people`, so pressing A near one
+  // does nothing at all.
+  // The numbers matter more than they look. A phone shows about 290 x 416 px of
+  // city, which is 2.5% of a disc 1250 px across — so the first attempt, with
+  // eighteen people spread over that disc, put 0.4 of a person on screen and
+  // the street still read as deserted. The count is set from the area instead:
+  // roughly one passer-by per 20,000 px², which is four to six of them in view.
+  const FOLK = 40;          // simulated at once, near you
+  const FOLK_KEEP = 520;    // px from the player before one is recycled
+  const FOLK_NEAR = 300;    // a recycled one comes back from off screen
+
+  /**
+   * @param anywhere  true only for the first fill. You should arrive to a
+   *   street that already has people on it, so the opening crop is seeded
+   *   across the whole disc — including the part you can see. After that they
+   *   always come back from off screen, because somebody blinking into
+   *   existence in front of you is worse than an empty pavement.
+   */
+  function seedWalker(w, anywhere) {
+    for (let tries = 0; tries < 30; tries++) {
+      const ang = Math.random() * Math.PI * 2;
+      const rad = anywhere
+        ? Math.sqrt(Math.random()) * (FOLK_KEEP - 40)     // sqrt: evenly by AREA
+        : FOLK_NEAR + Math.random() * (FOLK_KEEP - FOLK_NEAR - 40);
+      const px = S.px + Math.cos(ang) * rad, py = S.py + Math.sin(ang) * rad;
+      if (!canStand(px, py)) continue;
+      w.px = px; w.py = py;
+      w.skin = SKIN[(Math.random() * SKIN.length) | 0];
+      w.shirt = SHIRT[(Math.random() * SHIRT.length) | 0];
+      // Most people are walking; a few are standing about, which is also true.
+      w.sp = Math.random() < 0.18 ? 0 : 0.020 + Math.random() * 0.022;
+      w.ang = Math.random() * Math.PI * 2;
+      w.turn = 600 + Math.random() * 2200;
+      w.step = Math.random() * 6;
+      return true;
+    }
+    return false;
+  }
+
+  function folk(dt) {
+    const first = S.walkers.length === 0;
+    while (S.walkers.length < FOLK) {
+      const w = {};
+      if (!seedWalker(w, first)) break;
+      S.walkers.push(w);
+    }
+    for (const w of S.walkers) {
+      if (Math.hypot(w.px - S.px, w.py - S.py) > FOLK_KEEP) { seedWalker(w, false); continue; }
+      if (!w.sp) continue;
+      w.turn -= dt;
+      if (w.turn <= 0) { w.ang += (Math.random() - 0.5) * 1.6; w.turn = 700 + Math.random() * 2400; }
+      const nx = w.px + Math.cos(w.ang) * w.sp * dt;
+      const ny = w.py + Math.sin(w.ang) * w.sp * dt;
+      // Corners are turned, not walked through. Try the whole step, then each
+      // axis on its own, so a wall makes somebody slide along it like a person
+      // rather than stop dead against it.
+      if (canStand(nx, ny)) {
+        w.px = nx; w.py = ny;
+      } else if (canStand(nx, w.py)) {
+        w.px = nx;
+        w.ang = Math.cos(w.ang) > 0 ? 0 : Math.PI;          // slide along the wall
+      } else if (canStand(w.px, ny)) {
+        w.py = ny;
+        w.ang = Math.sin(w.ang) > 0 ? Math.PI / 2 : -Math.PI / 2;
+      } else {
+        w.ang += 1.4 + Math.random();                        // cornered: turn away
+      }
+      w.step += dt * 0.012;
+    }
+  }
 
   // ── traffic simulation ──────────────────────────────────
   function pointOn(e, d) {
@@ -389,7 +489,7 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
 
   return {
     map, S, people, districts, TS, W, H, at, spot,
-    move, traffic, nearest, districtNow, pointOn,
+    move, traffic, folk, nearest, districtNow, pointOn, canStand, START,
     tint, grid, FACES, ROOFS,
   };
 }

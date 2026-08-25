@@ -254,7 +254,7 @@ export const settings = {
 // `heard` is the whole quest log. There are no map markers by design, so a
 // mission you have not been pointed at does not appear in the log at all —
 // you can still walk into it, it is simply not something you know about yet.
-const BLANK_GAME = { done: [], heard: [], seen: {}, at: null, track: null };
+const BLANK_GAME = { done: [], heard: [], spoke: [], seen: {}, at: null, track: null };
 
 export const game = {
   all: () => ({ ...blank(BLANK_GAME), ...read('game', {}) }),
@@ -269,6 +269,16 @@ export const game = {
     let any = false;
     for (const id of ids || []) if (!g.heard.includes(id)) { g.heard.push(id); any = true; }
     if (any) this.save(g);
+    return g;
+  },
+  /**
+   * Somebody in the street you have already stopped and asked. Their mark stays
+   * out across sessions — `heard` records what they pointed AT, which is not the
+   * same thing and says nothing at all about a crowd line that points nowhere.
+   */
+  spokeTo(id) {
+    const g = this.all();
+    if (!g.spoke.includes(id)) { g.spoke.push(id); this.save(g); }
     return g;
   },
   /** One more meeting with a phrase. The help ladder reads this. */

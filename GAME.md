@@ -242,6 +242,44 @@ Granada at all.
 **The tab takes the Scenes slot**, as decided: Scenes is already a tile on
 Today. A course with scenes and no game keeps its Scenes tab untouched.
 
+**There is street life, and it is not the quest system.** Kevin, playing:
+*"The game feels empty, Im walking around granada and I cant find anyone."* He
+was right, and the numbers are brutal: the 248 people with something to say
+stand in twelve tight knots, and the city is **2,059 screenfuls**. Measured over
+a walk, **18–23% of screens had nobody on them at all**, and out past the
+districts it is all of them.
+
+So `folk()` in `world.js` keeps about forty passers-by near you — seeded evenly
+by area on the first fill so you arrive to an inhabited street, and afterwards
+always recycled in from off screen so nobody blinks into existence in front of
+you. That is 6–8 on screen, and 0% empty screens.
+
+**They carry no bubble and they cannot be talked to**, which is the point: the
+game already teaches that a bubble means somebody has something to say, so a
+passer-by without one is unambiguous rather than a disappointment. `nearest()`
+only ever looks at `people`, so pressing A beside one does nothing. They do not
+block you either — being body-checked by scenery is worse than an empty street.
+
+The first attempt had eighteen of them over a 1250 px radius, which is 0.4 of a
+person on screen and still read as deserted. **Set the count from the area, not
+by eye.**
+
+**There is a map, and it deliberately does not tell you where anybody is.**
+Kevin asked for *"a map I can pop up so I can see what the city looks like and
+know where to go and where the districts are"*. It is the button under the HUD:
+the whole city painted from the tile grid, a pin and a name for each of the
+twelve districts, and you. **No mission markers** — same reason the arrow
+switches off at the district boundary. Knowing Xalteva is west of you is
+geography; knowing which doorway is the answer.
+
+Districts are drawn as **pins, not circles**. Circles were tried first and are
+the wrong drawing: a district's radius is measured from how far apart its
+missions ended up, so Xalteva and La Terminal came out big enough to cover half
+of Granada while six others piled up on the same spot. Only the district you are
+standing in gets its actual extent drawn, because "am I there yet" is the one
+question the shape answers. The twelve labels are nudged clear of each other
+rather than drawn on top of each other.
+
 **The HUD** is one line — `El Centro · 12/122` — and tapping it opens the
 quest log. **The log holds only what the street has told you**: a mission
 nobody has pointed you at is not in it, because there are no map markers and
@@ -259,6 +297,50 @@ python scripts/game_bake.py --content ../fluidez-es-ni --app
 node docs/js/game/game.test.mjs              # the app
 node mockups/checkworld.js                   # the mockup
 ```
+
+### Bugs that are fixed, and the shape of them
+
+Worth reading before changing this screen, because most of them are the same
+mistake: **`G` is rebuilt when you come back, but the DOM is not.**
+
+- **Leaving mid-conversation soft-locked the game.** `stop()` tore down the loop
+  and left the beat panel up. Coming back gave you a fresh `G` with `npc: null`
+  behind a live panel: Say it threw, tapping a chunk wiped the tray, and the
+  beat panel was the one panel with no way out. Only a reload cleared it.
+  `stop()` now shuts the overlays too, and a beat has a ✕ on it.
+- **The thumbstick stayed pushed.** `STICK` is module state and the end handlers
+  were gated on `G`, so a thumb still down when you switched tabs left it on —
+  you came back walking by yourself, with the keyboard ignored, forever.
+- **Every crowd bubble came back.** Only what somebody pointed AT was saved, not
+  that you had spoken to them, so you could never tell who you had already
+  asked — and somebody pointing at nothing was forgotten entirely.
+- **A saved position was restored without checking it.** The comment claimed it
+  did. Rebuild the map onto where you logged off and you were frozen for good.
+- **A won beat could be sent twice.** The placed chunks stayed live buttons, so
+  tapping one rebuilt the tray and re-enabled Say it: two rungs up the help
+  ladder for one conversation, or a miss recorded on a beat already banked.
+- **The help box got LOUDER the better you knew a phrase** — `lvl === 2` where
+  everything else means `>= 2`, so the third meeting fell back to level-0 styling
+  with nothing in it.
+- **The arrow banner hid behind the HUD** on a 390-wide phone.
+- **Tapping Granada and away again before the import landed** started the whole
+  world inside a hidden section — a 0x0 canvas running a full frame loop.
+- **Backgrounding lost up to eight seconds of walking**: position was saved only
+  by a timer inside the rAF loop, and rAF stops when the tab is hidden.
+- **`spot('')` matched the first spot in the list**, so a mission with an
+  unrecognised district was silently placed at whatever spot 0 happened to be.
+- The eight-second autosave also re-stamped `updatedAt` **while standing still**,
+  which makes doing nothing look like progress to the sync.
+
+**`game.test.mjs` plays a beat for real now** — the stub DOM parses the chunk
+tray out of `innerHTML`, so a test can tap chunks and press Say it. Before that
+it could open a conversation but never finish one, which is how a broken
+`land()` sat behind twenty passing checks. Each test also tears the screen down
+afterwards; one failure used to leave the game running and every check after it
+measured the wrong world.
+
+**Every one of the fixes above was verified by putting the bug back** and
+checking the suite goes red. If you fix something here, do that.
 
 **3. What is left.** The mockup and the app now carry two copies of the same
 engine. The mockup is the design sketch and the app is the real thing; if they

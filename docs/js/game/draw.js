@@ -228,6 +228,17 @@ export function createPainter(world) {
 
     for (const v of S.traffic) if (v.x !== undefined) vehicle(ctx, v);
 
+    // The people just going somewhere. Drawn before the ones with something to
+    // say, so a bubble is never hidden behind a passer-by's head.
+    for (const w of S.walkers) {
+      if (w.px === undefined) continue;
+      if (Math.abs(w.px - S.px) > VW / SCALE / 2 + 30 ||
+          Math.abs(w.py - S.py) > VH / SCALE / 2 + 30) continue;
+      const c = Math.cos(w.ang), s2 = Math.sin(w.ang);
+      const dir = Math.abs(c) > Math.abs(s2) ? (c > 0 ? 3 : 2) : (s2 > 0 ? 0 : 1);
+      person(ctx, w.px, w.py, w.skin, w.shirt, w.sp ? dir : 0, w.sp ? w.step : 0);
+    }
+
     // Only the ones you can see. There are 248 people in this city and drawing
     // all of them every frame to put 240 of them off screen would be the most
     // expensive thing the game does.

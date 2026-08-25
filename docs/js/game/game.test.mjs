@@ -20,9 +20,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const DOCS = join(HERE, '..', '..');
 
 let passed = 0;
+// Set once the screen module is loaded. A test that throws part-way used to
+// leave the game running, so the NEXT start() returned early and every check
+// after it was quietly measuring the wrong world — three cascading failures
+// from one real bug. Each test now begins from a torn-down screen.
+let cleanup = null;
 const test = (name, fn) => {
   try { fn(); passed++; }
-  catch (e) { console.error(`FAIL  ${name}\n      ${e.message}`); process.exitCode = 1; }
+  catch (e) { console.error(`FAIL  ${name}\n      ${String(e.message).split('\n')[0]}`); process.exitCode = 1; }
+  finally { if (cleanup) cleanup(); }
 };
 
 // ── a browser, more or less ─────────────────────────────────
@@ -31,17 +37,50 @@ const ctx2d = () => new Proxy({}, {
   get(t, k) {
     if (k in drew) return () => { drew[k]++; };
     if (k === 'measureText') return () => ({ width: 10 });
+    // The map paints the whole city one tile at a time into an ImageData, so
+    // this has to be real storage rather than a shrug.
+    if (k === 'createImageData') return (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
+    if (k === 'getImageData') return (x, y, w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
     return t[k] === undefined ? () => {} : t[k];
   },
   set(t, k, v) { t[k] = v; return true; },
 });
 const nodes = new Map();
+
+// Enough of a DOM to play a beat. The chunk tray is painted as innerHTML and
+// then queried for its buttons, so a stub that answers querySelectorAll with an
+// empty list can start a conversation but can never finish one — which is how a
+// broken land() sat behind twenty passing checks. These children are parsed out
+// of whatever innerHTML the code last wrote and cached until it writes again,
+// so the handlers the code attaches are still on them when a test clicks.
+const TILE = /<button[^>]*data-id="(\d+)"[^>]*>([\s\S]*?)<\/button>/g;
 const makeEl = (id) => {
   const listeners = {};
+  let html = '', kids = null;
+  const children = () => {
+    if (kids) return kids;
+    kids = [];
+    TILE.lastIndex = 0;
+    let m;
+    while ((m = TILE.exec(html)) !== null) kids.push(makeTile(m[1], m[2]));
+    return kids;
+  };
   const node = {
-    id, width: 0, height: 0, textContent: '', innerHTML: '', style: {},
+    id, width: 0, height: 0, textContent: '', style: {},
+    get innerHTML() { return html; },
+    set innerHTML(v) { html = String(v); kids = null; },
     dataset: {}, disabled: false,
-    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    // A real one: whether an overlay is still up after you leave the screen is
+    // exactly the kind of thing this file exists to catch.
+    classList: (() => {
+      const set = new Set();
+      return {
+        add: (...c) => c.forEach((x) => set.add(x)),
+        remove: (...c) => c.forEach((x) => set.delete(x)),
+        toggle: (c, on) => (on === undefined ? (set.has(c) ? set.delete(c) : set.add(c)) : (on ? set.add(c) : set.delete(c))),
+        contains: (c) => set.has(c),
+      };
+    })(),
     // left/top matter: the stick works out its centre from this, and without
     // them every pointer position came out NaN and the knob never moved.
     getBoundingClientRect: () => (id === 'gameStick'
@@ -49,7 +88,7 @@ const makeEl = (id) => {
       : { left: 0, top: 0, width: 390, height: 560, right: 390, bottom: 560 }),
     getContext: () => ctx2d(),
     addEventListener: (ev, fn) => { (listeners[ev] || (listeners[ev] = [])).push(fn); },
-    querySelectorAll: () => [],
+    querySelectorAll: () => children(),
     appendChild() {}, removeChild() {}, focus() {},
     fire: (ev, extra) => {
       let prevented = false;
@@ -60,14 +99,28 @@ const makeEl = (id) => {
     setPointerCapture() {}, releasePointerCapture() {},
     listenerCount: (ev) => (listeners[ev] || []).length,
     get firstChild() { return null; },
+    // The map sizes itself against the box it is dropped into.
+    parentNode: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 360, height: 460, right: 360, bottom: 460 }) },
   };
   return node;
 };
+// One chunk button in the tray or in the answer being built.
+function makeTile(dataId, text) {
+  const listeners = {};
+  return {
+    dataset: { id: dataId },
+    textContent: text,
+    addEventListener: (ev, fn) => { (listeners[ev] || (listeners[ev] = [])).push(fn); },
+    fire: (ev) => { (listeners[ev] || []).forEach((f) => f({ preventDefault() {} })); },
+  };
+}
+
 globalThis.document = {
   getElementById: (id) => nodes.get(id) || (nodes.set(id, makeEl(id)), nodes.get(id)),
   createElement: () => makeEl('canvas'),
   querySelectorAll: () => [],
   addEventListener() {},
+  visibilityState: 'visible',
 };
 globalThis.window = globalThis;
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };
@@ -304,6 +357,7 @@ test('every mission is pointed at by somebody in the street', () => {
 // ── the screen, HUD and quest log ───────────────────────────
 const screen = await import('./screen.js');
 const store = await import('../store.js');
+cleanup = () => { try { screen.stop(); } catch {} };
 
 test('the screen starts, runs and stops without a browser', () => {
   store.setUser('test');
@@ -384,6 +438,194 @@ test('the quest log holds only what the street has told you', () => {
   // and the help ladder counts phrases, which is what fades it
   assert.equal(store.game.met('Buenas'), 1);
   assert.equal(store.game.met('Buenas'), 2);
+});
+
+// ── playing a beat, from the outside ────────────────────────
+// Walk onto somebody, press A, lay the chunks down in their written order —
+// which the grader accepts — and send it. Everything the dialogue does wrong
+// is only reachable this way, which is why the stub DOM parses the tray.
+const { esc } = await import('../ui.js');
+
+/** The world the SCREEN is running, which is not the bare one built above. */
+const W2 = () => screen.__test.world();
+
+function standOn(id) {
+  const seat = world.people.find((p) => p.id === id);
+  store.game.where(seat.x * TS + 8, seat.y * TS + 8);
+}
+function tapChunk(text) {
+  const tile = document.getElementById('gameTray').querySelectorAll('.gtile')
+    .find((t) => t.textContent === esc(text));
+  assert.ok(tile, `"${text}" is not in the tray`);
+  tile.fire('click');
+}
+function answer(beat) {
+  for (const chunk of beat.tiles) tapChunk(chunk);
+  document.getElementById('gameSend').fire('click');
+}
+
+// ── leaving, and coming back ────────────────────────────────
+const withBeats = missions.find((m) => m.beats && m.beats.length);
+
+test('walking out mid-conversation does not leave a dead panel over the world', () => {
+  // The panel is DOM and outlives G. Leaving used to keep it up with a fresh
+  // empty G behind it: Say it threw on a null npc, tapping a chunk wiped the
+  // tray, and the beat panel has no Leave button — so only a reload cleared it.
+  store.setUser('softlock');
+  standOn(withBeats.id);
+  screen.start({ missions, crowd });
+  document.getElementById('gameA').fire('click');
+  assert.ok(document.getElementById('gameTalk').classList.contains('on'), 'never opened');
+
+  screen.stop();
+  assert.ok(!document.getElementById('gameTalk').classList.contains('on'),
+    'the dialogue is still up over the world');
+  assert.equal(document.getElementById('gamePanel').innerHTML, '', 'the panel still holds a beat');
+
+  // And coming back must be a clean world, not a trap.
+  screen.start({ missions, crowd });
+  assert.ok(!document.getElementById('gameTalk').classList.contains('on'));
+  screen.stop();
+});
+
+test('you can walk away from a conversation without leaving the screen', () => {
+  store.setUser('walkaway');
+  standOn(withBeats.id);
+  screen.start({ missions, crowd });
+  document.getElementById('gameA').fire('click');
+  assert.ok(document.getElementById('gameTalk').classList.contains('on'));
+  // getElementById here conjures anything you ask it for, so the button has to
+  // be found in the panel's own markup before firing it proves anything.
+  assert.ok(/id="gameAway"/.test(document.getElementById('gamePanel').innerHTML),
+    'the beat panel has no way out of it');
+  document.getElementById('gameAway').fire('click');
+  assert.ok(!document.getElementById('gameTalk').classList.contains('on'), 'walking away did nothing');
+});
+
+test('a thumb still on the stick when you leave does not walk you afterwards', () => {
+  store.setUser('stuckstick');
+  screen.start({ missions, crowd });
+  const stick = document.getElementById('gameStick');
+  stick.fire('pointerdown', { pointerId: 7, clientX: 86, clientY: 666 });
+  stick.fire('pointermove', { pointerId: 7, clientX: 86 + 60, clientY: 666 });
+  screen.stop();                       // tab switch with the thumb still down
+
+  screen.start({ missions, crowd });
+  const before = { x: W2().S.px, y: W2().S.py };
+  for (let i = 0; i < 30; i++) screen.__test.frame(i * 16);
+  const after = { x: W2().S.px, y: W2().S.py };
+  assert.equal(after.x, before.x, 'walked off on its own');
+  assert.equal(after.y, before.y, 'walked off on its own');
+  screen.stop();
+});
+
+test('somebody you have already asked in the street stays asked', () => {
+  // Only what they pointed AT used to be saved, so all 126 crowd bubbles came
+  // back every time you opened the screen and you could not tell who you had
+  // already stopped. A crowd line pointing at nothing was forgotten entirely.
+  const quiet = crowd.find((c) => !(c.points_at || []).length) || crowd[0];
+  store.setUser('spoke');
+  standOn(quiet.id);
+  screen.start({ missions, crowd });
+  document.getElementById('gameA').fire('click');
+  document.getElementById('gameBye').fire('click');
+  screen.stop();
+
+  assert.ok(store.game.all().spoke.includes(quiet.id), 'the speaker was not remembered');
+  screen.start({ missions, crowd });
+  assert.equal(W2().S.finished[quiet.id], true, 'their bubble came back');
+  screen.stop();
+});
+
+test('a saved position inside a wall does not freeze you there for good', () => {
+  store.setUser('walled');
+  // A spot that is solid, and a half-written one out of a truncated restore.
+  for (const bad of [{ x: 0, y: 0 }, { x: 100 }, { x: 1e9, y: 1e9 }]) {
+    store.game.where(bad.x, bad.y);
+    screen.start({ missions, crowd });
+    const { S } = W2();
+    assert.ok(Number.isFinite(S.px) && Number.isFinite(S.py), `NaN from ${JSON.stringify(bad)}`);
+    assert.ok(W2().canStand(S.px, S.py), `dropped into a wall from ${JSON.stringify(bad)}`);
+    screen.stop();
+  }
+});
+
+test('a beat you have already won cannot be sent a second time', () => {
+  // land() left the placed chunks as live buttons, so tapping one rebuilt the
+  // tray and re-enabled Say it — two rungs up the help ladder for one beat.
+  const m = missions.find((x) => x.beats[0] && x.beats[0].key);
+  const beat = m.beats[0];
+  store.setUser('twice-beat');
+  standOn(m.id);
+  screen.start({ missions, crowd });
+  document.getElementById('gameA').fire('click');
+  answer(beat);
+  const once = store.game.all().seen[beat.key];
+  assert.equal(once, 1, `winning it once counted ${once}`);
+
+  // Whatever is still on screen, none of it may bank the beat again.
+  document.getElementById('gameBuilt').querySelectorAll('.gtile').forEach((t) => t.fire('click'));
+  document.getElementById('gameSend').fire('click');
+  assert.equal(store.game.all().seen[beat.key], 1, 'the same beat counted twice');
+  screen.stop();
+});
+
+// ── the street ──────────────────────────────────────────────
+test('there are people on the street, and they stay out of the walls', () => {
+  store.setUser('folk');
+  screen.start({ missions, crowd });
+  const w = W2();
+  for (let i = 0; i < 400; i++) screen.__test.frame(i * 16);
+  assert.ok(w.S.walkers.length >= 10, `only ${w.S.walkers.length} people about`);
+  for (const p of w.S.walkers) {
+    assert.ok(Number.isFinite(p.px) && Number.isFinite(p.py), 'a walker went to NaN');
+    assert.ok(w.canStand(p.px, p.py), 'somebody is walking through a building');
+  }
+  screen.stop();
+});
+
+test('a passer-by is never mistaken for somebody you can talk to', () => {
+  // They carry no bubble and nearest() only ever looks at `people`, so standing
+  // on one has to do nothing at all rather than open an empty panel.
+  store.setUser('folk2');
+  screen.start({ missions, crowd });
+  const w = W2();
+  for (let i = 0; i < 60; i++) screen.__test.frame(i * 16);
+  // One who is not also standing next to somebody real, or this proves nothing.
+  const alone = w.S.walkers.find((p) => p.px !== undefined && w.people.every((n) =>
+    Math.hypot(n.x * TS + 8 - p.px, n.y * TS + 8 - p.py) > 60));
+  assert.ok(alone, 'no passer-by was out on their own to test with');
+  w.S.px = alone.px; w.S.py = alone.py;
+  const near = w.nearest();
+  assert.ok(!near, `a passer-by answered as "${near && near.name}"`);
+  document.getElementById('gameA').fire('click');
+  assert.ok(!document.getElementById('gameTalk').classList.contains('on'));
+});
+
+// ── the map ─────────────────────────────────────────────────
+test('the map opens, draws the city and knows where you are', () => {
+  store.setUser('map');
+  screen.start({ missions, crowd });
+  const before = drew.fillRect + drew.arc + drew.drawImage;
+  document.getElementById('gameMapBtn').fire('click');
+  assert.ok(document.getElementById('gameMap').classList.contains('on'), 'the map did not open');
+  assert.ok(drew.drawImage > 0, 'the city was never drawn');
+  assert.ok(drew.arc > 0, 'no districts and no you');
+  assert.ok(drew.fillRect + drew.arc + drew.drawImage > before);
+  const sub = document.getElementById('gameMapSub').textContent;
+  assert.ok(/You are/.test(sub), `the map says "${sub}"`);
+
+  document.getElementById('gameMapClose').fire('click');
+  assert.ok(!document.getElementById('gameMap').classList.contains('on'));
+  screen.stop();
+});
+
+test('the map does not survive leaving the screen either', () => {
+  store.setUser('map2');
+  screen.start({ missions, crowd });
+  document.getElementById('gameMapBtn').fire('click');
+  screen.stop();
+  assert.ok(!document.getElementById('gameMap').classList.contains('on'));
 });
 
 test('game progress rides along with the cloud snapshot', () => {
