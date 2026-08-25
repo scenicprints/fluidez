@@ -47,7 +47,12 @@ const makeEl = (id) => {
     addEventListener: (ev, fn) => { (listeners[ev] || (listeners[ev] = [])).push(fn); },
     querySelectorAll: () => [],
     appendChild() {}, removeChild() {}, focus() {},
-    fire: (ev) => (listeners[ev] || []).forEach((f) => f({ preventDefault() {} })),
+    fire: (ev) => {
+      let prevented = false;
+      (listeners[ev] || []).forEach((f) => f({ preventDefault() { prevented = true; } }));
+      return prevented;
+    },
+    listenerCount: (ev) => (listeners[ev] || []).length,
     get firstChild() { return null; },
   };
   return node;
@@ -267,6 +272,28 @@ test('the screen starts, runs and stops without a browser', () => {
   assert.ok(screen.isRunning(), 'did not start');
   screen.stop();
   assert.ok(!screen.isRunning(), 'did not stop');
+});
+
+test('leaving and coming back does not stack a second set of listeners', () => {
+  // Every handler used to be added on each start, so opening the game twice
+  // gave the A button two click handlers and the HUD two openLog calls.
+  store.setUser('twice');
+  screen.start({ missions, crowd });
+  screen.stop();
+  screen.start({ missions, crowd });
+  screen.stop();
+  const a = document.getElementById('gameA');
+  assert.equal(a.listenerCount('click'), 1,
+    `A button has ${a.listenerCount('click')} click handlers`);
+  assert.equal(document.getElementById('gameHud').listenerCount('click'), 1);
+});
+
+test('a long press on the controls is refused, not offered as Copy', () => {
+  // Android and desktop raise contextmenu on a long press; iOS is handled by
+  // -webkit-touch-callout in the stylesheet, which cannot be tested from here.
+  const sec = document.getElementById('sc-game');
+  assert.equal(sec.listenerCount('contextmenu'), 1, 'nothing suppresses contextmenu');
+  assert.equal(sec.fire('contextmenu'), true, 'contextmenu was not prevented');
 });
 
 test('the HUD counts the missions, not the crowd', () => {

@@ -412,9 +412,25 @@ const KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 
 
 let wired = false;
 function wireControls() {
+  // Wired ONCE, not once per start. Every handler reads G at the moment it
+  // fires rather than closing over it, so they stay correct across leaving the
+  // screen and coming back — and re-wiring on each start would stack a second
+  // copy of every listener, which is how one tap starts opening the quest log
+  // twice.
+  if (wired) return;
+  wired = true;
+
   $('gameA').addEventListener('click', tryTalk);
   $('gameHud').addEventListener('click', openLog);
   $('gameLogClose').addEventListener('click', closeLog);
+
+  // Long-pressing a d-pad button offered to copy the arrow out of it. The CSS
+  // stops iOS showing its callout; this stops Android and desktop raising a
+  // context menu over the controls. Nothing in this screen is text you would
+  // ever want to select.
+  const sec = document.getElementById('sc-game');
+  if (sec) sec.addEventListener('contextmenu', (e) => e.preventDefault());
+
   for (const b of document.querySelectorAll('#sc-game .dbtn')) {
     const dir = b.dataset.dir;
     const on = (e) => { e.preventDefault(); if (G) press(dir); b.classList.add('held'); };
@@ -424,8 +440,6 @@ function wireControls() {
     b.addEventListener('pointerleave', off);
     b.addEventListener('pointercancel', off);
   }
-  if (wired) return;
-  wired = true;
   addEventListener('keydown', (e) => {
     if (!G || G.talking) return;
     const k = KEYS[e.key];

@@ -922,6 +922,18 @@ button.setrow:active { border-color: var(--oro-d); background: var(--ceniza2); }
    reuses .es .en .who .go .fb .chip: the mockup was built from this stylesheet
    in the first place, so those already mean exactly the right thing. */
 /* display comes from .screen — do not restate it here */
+
+/* Holding a control down must not offer to copy it.
+   Two different things do that. iOS pops its callout menu on a long press
+   unless -webkit-touch-callout is off; Android and desktop select the text
+   inside the button and raise a contextmenu, which screen.js suppresses.
+   It is scoped to the game because the rest of Fluidez is something you read,
+   and text you cannot select in a reading app would be worse than the bug. */
+#sc-game, #sc-game * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 #sc-game .gamewrap { position: relative; flex: 1; min-height: 0; background: #6E5B45; overflow: hidden; }
 #sc-game canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; touch-action: none; }
 
