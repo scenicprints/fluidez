@@ -228,12 +228,17 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
   }
   // The crowd. There are no map markers and Granada has no usable street
   // names, so these ARE the quest system.
-  const ring = [[6,4],[-7,5],[5,-6],[-6,-5],[10,0],[0,9],[-11,1],[2,-11],
-                [12,7],[-12,-7],[8,-9],[-9,8]];
+  // Spread as wide as the missions are. A district's people are placed a few
+  // hundred metres across now, so a crowd huddled inside seventy metres of the
+  // anchor would be a knot of hint-givers in the middle of an area with nobody
+  // in the rest of it — you would get every direction in one spot and then walk
+  // the district alone.
+  const ring = [[13,9],[-15,11],[11,-13],[-13,-11],[21,0],[0,19],[-23,2],[4,-23],
+                [25,15],[-25,-15],[17,-19],[-19,17]];
   crowd.forEach((h, j) => {
     const anchor = spot(DISTRICT[h.district] || '') || pc;
     const [ox, oy] = ring[j % ring.length];
-    const w = standing(anchor.x + ox + (j % 5) * 3 - 6, anchor.y + oy + (j % 3) * 4 - 4);
+    const w = standing(anchor.x + ox + (j % 5) * 6 - 12, anchor.y + oy + (j % 3) * 8 - 8);
     people.push({
       id: h.id || ('crowd-' + j), crowd: true, district: h.district,
       name: h.kind, says: h.says, en: h.en, points_at: h.points_at || [],
@@ -256,7 +261,17 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
     const d = districts[key], n = d.list.length;
     d.x = d.list.reduce((a, p) => a + p.x, 0) / n;
     d.y = d.list.reduce((a, p) => a + p.y, 0) / n;
-    d.r = Math.max(28, ...d.list.map((p) => Math.hypot(p.x - d.x, p.y - d.y))) + 10;
+    // The radius covers MOST of the district, not its furthest straggler.
+    //
+    // Taking the maximum let one outlier set it for everybody: the man who
+    // looks after the cemetery is a kilometre west of the church, and he has
+    // to be, so Xalteva's radius came out at 185 tiles — nearly a mile — and
+    // the arrow switched off while you were still in the middle of town. The
+    // third quartile is the district as it actually is, and the straggler is
+    // then found the way everything else is, by asking somebody.
+    const away = d.list.map((p) => Math.hypot(p.x - d.x, p.y - d.y)).sort((a, b) => a - b);
+    const q3 = away[Math.min(away.length - 1, Math.floor(away.length * 0.75))];
+    d.r = Math.max(28, Math.min(q3 + 14, 120));
   }
 
   // ── state ───────────────────────────────────────────────

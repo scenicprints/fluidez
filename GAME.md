@@ -298,6 +298,49 @@ node docs/js/game/game.test.mjs              # the app
 node mockups/checkworld.js                   # the mockup
 ```
 
+### Where people stand, and the three ways it was wrong
+
+Kevin, after the map went in: *"Yes, fix those missions. Spread out the people
+so the quests arent so concentrated."* Three separate problems, and only the
+first one was visible from the outside.
+
+**The street crowd for three districts was in the wrong part of the city.** The
+crowd is placed around `DISTRICT[district]` in `world.js`; the missions are
+placed at their own named spots in `PLACE`. Nothing ever checked the two agreed.
+`Isla El Castillo` and `Barrio Posintepe` **are not in the OSM extract at all**,
+so `spot()` returned nothing and both fell through to Parque Central; `Plaza la
+Fuente` is in the middle of town while every Malecón mission is out at the
+Centro Turístico. So the people pointing you at Afuera, Pantanal and Malecón
+missions were standing **1.0–1.3 km away, in somebody else's district**.
+Measured: **32 of 122 missions were more than 400 m from anyone who points at
+them. Now 5**, and four of those five are the cemetery and the far end of
+Pantanal, which are genuinely out of town.
+
+**La Terminal had no middle.** Its ten missions were split between Transnica and
+the UCA microbus stop, **1.1 km apart on opposite sides of the city**, so the
+district centre — the average of the two — landed 81 m from Tu barrio's centre,
+and the arrow pointed at empty ground between them. All ten are at Transnica
+now. Both are real places, but a cobrador, a ticket window, a taxista and
+somebody seeing a relative off belong at the same terminal, and no mission says
+otherwise.
+
+**A district was one screenful.** Nine of the twelve hung every mission off a
+single named place with offsets inside about seventy metres. `SPREAD` in
+`game_bake.py` widens them per district — a district is now 150–370 m across,
+a few blocks you walk through. The crowd ring in `world.js` was widened to
+match, or you get all the hints in one knot and then walk the rest alone.
+
+**The radius is the third quartile, not the maximum.** One straggler used to set
+it for everybody: the man who looks after the cemetery is a kilometre west of
+the church **and has to be**, so Xalteva's radius came out at 925 m and the
+arrow switched off while you were still in the middle of town. Do not "fix" that
+by moving him — the straggler is found the way everything else is, by asking.
+
+`game.test.mjs` now fails if a named place does not resolve, if a district's
+crowd drifts more than 400 m from its own missions, or if a radius leaves the
+100–500 m band. The first of those would have caught `Isla El Castillo` on the
+day it was written.
+
 ### Bugs that are fixed, and the shape of them
 
 Worth reading before changing this screen, because most of them are the same

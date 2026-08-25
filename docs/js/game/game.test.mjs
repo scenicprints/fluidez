@@ -144,6 +144,7 @@ Object.defineProperty(globalThis.localStorage, 'length', { get: () => 0 });
 
 const { createWorld, TS, SOLID, KINDS } = await import('./world.js');
 const { createPainter } = await import('./draw.js');
+const { PLACE, DISTRICT } = await import('./place.js');
 
 // ── the real missions, out of the content repo ──────────────
 // Read straight out of the sibling checkout, so this tests the actual
@@ -345,6 +346,47 @@ test('every beat is winnable with the app\'s own grader', () => {
       const texts = b.tiles.concat(b.extra || []);
       assert.equal(new Set(texts).size, texts.length, `${where} has a chunk twice`);
     }
+  }
+});
+
+// ── where everybody stands ──────────────────────────────────
+test('every named place the bake asks for is really on the map', () => {
+  // `Isla El Castillo` and `Barrio Posintepe` were not in the OSM extract at
+  // all. spot() found nothing, the anchor fell back to Parque Central, and the
+  // street crowd for Afuera and Pantanal ended up in the middle of town
+  // pointing at missions a kilometre away. Nothing said a word about it.
+  const missing = [];
+  for (const key of Object.keys(DISTRICT)) {
+    if (!world.spot(DISTRICT[key])) missing.push(`district ${key} -> "${DISTRICT[key]}"`);
+  }
+  for (const id of Object.keys(PLACE)) {
+    if (!world.spot(PLACE[id].at)) missing.push(`${id} -> "${PLACE[id].at}"`);
+  }
+  assert.deepEqual(missing, [], `named places that do not exist:\n      ${missing.join('\n      ')}`);
+});
+
+test('a district crowd stands where that district is', () => {
+  // The crowd is placed round the district anchor and the missions round their
+  // own named places, so the two can drift apart without anything failing.
+  // Malecon's hint-givers were 1.1 km from every Malecon mission.
+  for (const key of Object.keys(world.districts)) {
+    const mis = world.people.filter((p) => !p.crowd && p.district === key);
+    const cro = world.people.filter((p) => p.crowd && p.district === key);
+    if (!cro.length || !mis.length) continue;
+    const mid = (l, f) => l.reduce((a, p) => a + f(p), 0) / l.length;
+    const gap = Math.hypot(mid(mis, (p) => p.x) - mid(cro, (p) => p.x),
+                           mid(mis, (p) => p.y) - mid(cro, (p) => p.y)) * 5;
+    assert.ok(gap < 400, `${key}: its crowd is ${Math.round(gap)} m from its missions`);
+  }
+});
+
+test('a district is a few blocks, not one tile and not half the city', () => {
+  // Too tight and you meet everybody at once and then walk through nothing;
+  // too loose and the arrow switches off while you are still miles away.
+  for (const key of Object.keys(world.districts)) {
+    const d = world.districts[key];
+    const m = d.r * 5;
+    assert.ok(m > 100 && m < 500, `${key} has a radius of ${Math.round(m)} m`);
   }
 });
 

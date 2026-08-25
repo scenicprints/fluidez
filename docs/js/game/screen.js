@@ -385,14 +385,17 @@ function openMap() {
   const placed = [];
   for (const p of pins) {
     const half = g.measureText(p.name).width / 2 + 3;
+    // Kept inside the canvas: Afuera and El Malecón sit close to the west and
+    // east edges of the city, and a name centred on the pin would hang off it.
+    p.lx = Math.max(half + 2, Math.min(w - half - 2, p.x));
     let ly = p.y - 9;
     for (let i = 0; i < 40; i++) {
-      const clash = placed.some((q) => Math.abs(q.y - ly) < 11 && Math.abs(q.x - p.x) < q.half + half);
+      const clash = placed.some((q) => Math.abs(q.y - ly) < 11 && Math.abs(q.lx - p.lx) < q.half + half);
       if (!clash) break;
       ly += (i % 2 ? -1 : 1) * (11 + Math.floor(i / 2) * 2);
     }
     p.ly = ly;
-    placed.push({ x: p.x, y: ly, half });
+    placed.push({ lx: p.lx, y: ly, half });
   }
 
   // The district you are standing in gets its actual extent drawn, because
@@ -415,9 +418,9 @@ function openMap() {
     // A dark rim under the text: the city beneath it is every colour, and a
     // plain label disappears over the roofs.
     g.lineWidth = 3; g.strokeStyle = 'rgba(16,13,11,.92)';
-    g.strokeText(p.name, p.x, p.ly);
+    g.strokeText(p.name, p.lx, p.ly);
     g.fillStyle = p.mine ? '#7FE0C6' : '#F0D9A8';
-    g.fillText(p.name, p.x, p.ly);
+    g.fillText(p.name, p.lx, p.ly);
   }
 
   // You.
