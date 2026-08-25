@@ -137,6 +137,11 @@ export function createMascot(hostEl, speechEl, sparksEl,
   let beat = null;
   let trip = null;
   let gone = false;
+  // Every listener this mascot binds hangs off one signal, so swapping the
+  // creature on a language change cannot leave a second copy reacting to
+  // taps on the same perch.
+  const life = new AbortController();
+  const { signal } = life;
 
   const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const asleep = () => hostEl.classList.contains('sleep');
@@ -300,10 +305,10 @@ export function createMascot(hostEl, speechEl, sparksEl,
       longFired = false;
       if (!onLongPress) return;
       press = setTimeout(() => { longFired = true; onLongPress(api); }, LONG_PRESS_MS);
-    }, { passive: true });
-    perch.addEventListener('pointerup', cancel, { passive: true });
-    perch.addEventListener('pointerleave', cancel, { passive: true });
-    perch.addEventListener('pointercancel', cancel, { passive: true });
+    }, { passive: true, signal });
+    perch.addEventListener('pointerup', cancel, { passive: true, signal });
+    perch.addEventListener('pointerleave', cancel, { passive: true, signal });
+    perch.addEventListener('pointercancel', cancel, { passive: true, signal });
 
     perch.addEventListener('click', () => {
       if (longFired) { longFired = false; return; }   // the long press already answered
@@ -311,10 +316,10 @@ export function createMascot(hostEl, speechEl, sparksEl,
       if (asleep()) return wake();                    // startle him first, poke next tap
       if (onPoke && onPoke(api)) return;              // a quiz answer was owed
       speak('poke');
-    });
+    }, { signal });
   }
 
-  if (ambient) document.addEventListener('pointerdown', armIdle, { passive: true });
+  if (ambient) document.addEventListener('pointerdown', armIdle, { passive: true, signal });
   armIdle();
 
   const api = {
@@ -328,6 +333,16 @@ export function createMascot(hostEl, speechEl, sparksEl,
     /** Score out of 100 → the matching bucket of earned lines. */
     reactToScore(pct) {
       return speak(pct >= 80 ? 'great' : pct >= 50 ? 'ok' : 'poor');
+    },
+
+    /**
+     * Take this mascot down: drop its listeners and stop every timer. Called
+     * before building a replacement, which happens when the course changes.
+     */
+    destroy() {
+      life.abort();
+      for (const timer of [revert, hush, idle, stretch, beat, trip]) clearTimeout(timer);
+      gone = true;
     },
 
     /**

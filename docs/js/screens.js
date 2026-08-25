@@ -1134,6 +1134,12 @@ export const momoHooks = { onLongPress: momoQuiz, onPoke: momoAnswer };
 // number that appears in an empty room.
 let wrapMomo = null;
 
+/** Drop the wrap-up mascot so the next score is reacted to by the new one. */
+export function resetWrapMascot() {
+  wrapMomo?.destroy?.();
+  wrapMomo = null;
+}
+
 function wrapBird() {
   if (!wrapMomo) {
     $('wrapMomo').innerHTML = mascotSvg('wrap');
@@ -1647,16 +1653,16 @@ export function renderSettings() {
     pad.appendChild(n);
   };
 
-  group('Learning');
+  group(t('setLearning'));
   // A switcher with one destination is a dead end. Shown as a plain fact
   // instead, so the course you are on is still on the screen.
   const canSwitch = content.languages.length > 1;
-  row('Language', canSwitch ? 'Switches lessons, words and voice' : 'The course you are learning',
+  row(t('setLanguage'), canSwitch ? t('setLanguageOn') : t('setLanguageOff'),
     `${esc(content.language?.flag || '')} ${esc(content.language?.name || '')}${canSwitch ? ' ›' : ''}`,
     canSwitch ? () => onSwitchLanguage() : null);
 
   const goalRow = el('div', 'setrow');
-  goalRow.innerHTML = '<span><span class="k">Daily goal</span><span class="kd">Reps to keep the streak alive</span></span>';
+  goalRow.innerHTML = `<span><span class="k">${esc(t('setGoal'))}</span><span class="kd">${esc(t('setGoalSub'))}</span></span>`;
   const seg = el('span', 'seg');
   for (const n of [10, 20, 40]) {
     const b = el('button', store.daily.goal() === n ? 'on' : '', String(n));
@@ -1674,12 +1680,12 @@ export function renderSettings() {
   goalRow.appendChild(segWrap);
   pad.appendChild(goalRow);
 
-  toggle('Remind me each evening', 'A nudge if you have not practised', s.reminder, (v) => store.settings.set('reminder', v));
+  toggle(t('setRemind'), t('setRemindSub'), s.reminder, (v) => store.settings.set('reminder', v));
 
   if (content.has('audio')) {
-    group('Voice');
+    group(t('setVoice'));
     const rateRow = el('div', 'setrow');
-    rateRow.innerHTML = '<span><span class="k">Speaking speed</span><span class="kd">Slower while you are starting out</span></span>';
+    rateRow.innerHTML = `<span><span class="k">${esc(t('setSpeed'))}</span><span class="kd">${esc(t('setSpeedSub'))}</span></span>`;
     const slider = el('input', 'slider');
     slider.type = 'range'; slider.min = '20'; slider.max = '100';
     slider.value = String(Math.round((s.speechRate || 0.45) * 100));
@@ -1692,45 +1698,44 @@ export function renderSettings() {
     rateRow.appendChild(w);
     pad.appendChild(rateRow);
 
-    toggle('Read lines aloud automatically', 'Plays the first line when a lesson opens', s.autoplay, (v) => store.settings.set('autoplay', v));
-    toggle('Scenes play before showing English', 'Listen first, then reveal', s.listenFirst !== false, (v) => store.settings.set('listenFirst', v));
+    toggle(t('setAutoplay'), t('setAutoplaySub'), s.autoplay, (v) => store.settings.set('autoplay', v));
+    toggle(t('setListenFirst'), t('setListenFirstSub'), s.listenFirst !== false, (v) => store.settings.set('listenFirst', v));
   }
 
-  group('Friends');
-  row('Invite a friend', 'They open the link and pick their own user ID', '›', async () => {
+  group(t('setFriends'));
+  row(t('setInvite'), t('setInviteSub'), '›', async () => {
     const url = location.href.split('#')[0];
     try {
       if (navigator.share) await navigator.share({ title: 'Fluidez', text: 'Learn Nicaraguan Spanish with me', url });
       else { await navigator.clipboard.writeText(url); toast('Link copied'); }
     } catch {}
   });
-  toggle('Show me on the streak board', 'Friends see your streak and level', s.shareStreak, (v) => {
+  toggle(t('setBoard'), t('setBoardSub'), s.shareStreak, (v) => {
     store.settings.set('shareStreak', v);
     if (!v) cloud.removeBoardRow(session.userId);
     else sync();
   });
 
-  group('Content');
-  const upd = row('Check for new lessons', `Version ${packVersion(content.language?.code) ?? '—'}`, '›', async () => {
-    upd.querySelector('.v').textContent = 'checking…';
+  group(t('setContent'));
+  const upd = row(t('setCheck'), `${t('setVersion')} ${packVersion(content.language?.code) ?? '—'}`, '›', async () => {
+    upd.querySelector('.v').textContent = t('setChecking');
     const r = await checkForContentUpdate(content.language);
     if (r.offline) return toast('No connection right now.');
-    if (!r.available) { upd.querySelector('.v').textContent = '✓ up to date'; return toast('Already up to date.'); }
+    if (!r.available) { upd.querySelector('.v').textContent = t('setUpToDate'); return toast('Already up to date.'); }
     toast('New lessons found — downloading');
     onSwitchLanguage(content.language.code, true);
   });
-  row('Downloaded', 'Everything works with no signal',
-    `${content.lessons.length} lessons · ${content.scenarios.length} scenes`, null);
-  row('Storage used', `Cached ${ago(content.manifest ? undefined : undefined)}`.replace('Cached never', 'On this device'),
-    esc(bytes(cacheSize())), null);
+  row(t('setDownloaded'), t('setDownloadedSub'),
+    esc(t('setDownloadedVal', { a: content.lessons.length, b: content.scenarios.length })), null);
+  row(t('setStorage'), t('setStorageSub'), esc(bytes(cacheSize())), null);
 
-  group('Account');
-  row('Signed in as', session.userId, esc(session.name), null);
-  row('Sign out', 'Your progress stays safe in the cloud', '›', () => onSignOut());
+  group(t('setAccount'));
+  row(t('setSignedIn'), session.userId, esc(session.name), null);
+  row(t('setSignOut'), t('setSignOutSub'), '›', () => onSignOut());
 
-  group('About');
-  row('Version', window.__FLUIDEZ_VERSION__ || 'dev', '', null);
-  const reset = row('Reset my progress', 'Clears every word, streak and lesson', '›', () => {
+  group(t('setAbout'));
+  row(t('setVersion'), window.__FLUIDEZ_VERSION__ || 'dev', '', null);
+  const reset = row(t('setReset'), t('setResetSub'), '›', () => {
     if (!confirm('Reset everything? Your words, streak and lessons all go back to zero.')) return;
     if (!confirm('Really? This cannot be undone.')) return;
     store.wipeUser(session.userId);

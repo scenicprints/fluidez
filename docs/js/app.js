@@ -14,6 +14,7 @@ import * as screens from './screens.js';
 
 const session = { userId: null, name: null };
 let momo = null;
+let onScreenCreature = null;   // which animal is actually drawn right now
 
 // ── update pipeline ─────────────────────────────────────────
 // One version number, stamped by CI into version.json and the service worker.
@@ -230,8 +231,18 @@ function launch(account, { celebrate = false } = {}) {
   // The course decides which animal this is, so it has to be chosen before
   // anything is drawn. A pack that names no mascot falls back to the one
   // mapped to its language code, and failing that to the original bird.
-  setCreature(content.language?.code || null, content.mascot);
+  const creature = setCreature(content.language?.code || null, content.mascot);
+
+  // Switching course has to actually change the animal. This used to be
+  // `if (!momo)`, so the second language chose its creature and then left the
+  // first one's on the branch — the whole app went German and Momo stayed.
+  if (momo && creature.id !== onScreenCreature) {
+    momo.destroy();
+    momo = null;
+    screens.resetWrapMascot();
+  }
   if (!momo) {
+    onScreenCreature = creature.id;
     $('momo').innerHTML = mascotSvg('home');
     momo = createMascot($('momo'), $('speech'), $('sparks'), screens.momoHooks);
   }
