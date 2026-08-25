@@ -342,6 +342,18 @@ measured the wrong world.
 **Every one of the fixes above was verified by putting the bug back** and
 checking the suite goes red. If you fix something here, do that.
 
+**To LOOK at the map**, which is a canvas inside the app and cannot be
+photographed from here:
+
+```bash
+node mockups/mappng.mjs out/map.png     # then open it
+```
+
+It draws the city the way `openMap` does, reading the colour table straight out
+of `screen.js` so it cannot drift. That is what caught the first version of the
+map, where the district circles covered half of Granada and half the labels sat
+on top of each other. Green tests would never have told you.
+
 **3. What is left.** The mockup and the app now carry two copies of the same
 engine. The mockup is the design sketch and the app is the real thing; if they
 drift, the app wins. Retiring `mockups/granada.html` once Kevin is happy with

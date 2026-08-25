@@ -11,3 +11,6 @@ shell/ios/Pods/
 .idea/
 *.iml
 .DS_Store
+
+# Preview renders — scripts/osm_granada.py and mockups/mappng.mjs write here.
+out/
