@@ -21,6 +21,7 @@
   <symbol id="ic-today" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.1"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7"/></symbol>
   <symbol id="ic-path" viewBox="0 0 24 24"><path d="M2.6 20.2h18.8"/><path d="M7 20.2 12 4.4l5 15.8"/><path d="M9.8 11.6h4.4"/></symbol>
   <symbol id="ic-scenes" viewBox="0 0 24 24"><path d="M2.8 6.2a1.9 1.9 0 0 1 1.9-1.9h8.6a1.9 1.9 0 0 1 1.9 1.9v4.2a1.9 1.9 0 0 1-1.9 1.9H7.2l-3.2 2.4v-2.4a1.9 1.9 0 0 1-1.2-1.9z"/><path d="M18.1 9.1h1.2a1.9 1.9 0 0 1 1.9 1.9v4.2a1.9 1.9 0 0 1-1.9 1.9v2.4l-3.2-2.4h-4.3"/></symbol>
+  <symbol id="ic-game" viewBox="0 0 24 24"><path d="M3 20.4h18"/><path d="M5.4 20.4v-8.2l6.6-4.6 6.6 4.6v8.2"/><path d="M9.6 20.4v-4.4h4.8v4.4"/><path d="M12 3.2v2.6"/></symbol>
   <symbol id="ic-words" viewBox="0 0 24 24"><path d="M12 6.5C10.3 5.2 8 4.7 4.3 5v12.5c3.7-.3 6 .2 7.7 1.5 1.7-1.3 4-1.8 7.7-1.5V5c-3.7-.3-6 .2-7.7 1.5z"/><path d="M12 6.5v12.5"/></symbol>
   <symbol id="ic-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="4.4"/><circle cx="12" cy="12" r="1"/></symbol>
   <symbol id="ic-verb" viewBox="0 0 24 24"><path d="M20.4 12a8.4 8.4 0 0 1-14.6 5.7"/><path d="M3.6 12a8.4 8.4 0 0 1 14.6-5.7"/><path d="M18.2 2.8v3.6h-3.6"/><path d="M5.8 21.2v-3.6h3.6"/></symbol>
@@ -223,6 +224,53 @@
       <button class="iconbtn" id="sceneClose" type="button" aria-label="Close">✕</button>
     </div>
     <div class="body"><div class="pad" id="scenePad"></div></div>
+  </section>
+
+  <!-- ══ GRANADA ══ -->
+  <!-- The game. It takes the Scenes slot on the tab bar, because Scenes is
+       already a tile on Today. Only a course that declares the `game` feature
+       ever gets this — es-ni does, de-ch does not. -->
+  <section class="screen" id="sc-game">
+    <div class="gamewrap">
+      <canvas id="gameCanvas"></canvas>
+
+      <!-- One quiet line. Everything else is behind the tap. -->
+      <button class="gamehud" id="gameHud" type="button">
+        <span class="gh-where" id="gameWhere">Granada</span>
+        <span class="gh-count" id="gameCount">0/0</span>
+        <svg class="gh-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      </button>
+
+      <div class="prompt" id="gamePrompt"></div>
+
+      <!-- the quest log -->
+      <div class="gamelog" id="gameLog">
+        <div class="gl-panel">
+          <div class="gl-top">
+            <div>
+              <div class="gl-title">What you have been told</div>
+              <div class="gl-sub">Nobody signposts anything here. This is only what the street has said to you.</div>
+            </div>
+            <button class="iconbtn" id="gameLogClose" type="button" aria-label="Close">✕</button>
+          </div>
+          <div class="gl-body" id="gameLogBody"></div>
+        </div>
+      </div>
+
+      <div class="talk" id="gameTalk"><div class="panel" id="gamePanel"></div></div>
+    </div>
+
+    <div class="gpad">
+      <div class="dpad">
+        <button class="dbtn u" data-dir="up" type="button" aria-label="Walk north">▲</button>
+        <button class="dbtn l" data-dir="left" type="button" aria-label="Walk west">◀</button>
+        <div class="dmid"></div>
+        <button class="dbtn r" data-dir="right" type="button" aria-label="Walk east">▶</button>
+        <button class="dbtn d" data-dir="down" type="button" aria-label="Walk south">▼</button>
+      </div>
+      <button class="abtn" id="gameA" type="button">A</button>
+    </div>
+    <nav class="tabs" id="tabsGame"></nav>
   </section>
 
   <!-- ══ WORDS ══ -->

@@ -352,6 +352,26 @@ store.onStoreChange(() => {});
 // Re-render whatever screen the user lands on, so nothing is ever stale.
 onScreen((id) => { if (screens.RENDERERS[id] && id !== 'today') screens.RENDERERS[id](); });
 
+// ── Granada ─────────────────────────────────────────────────
+// The world is a requestAnimationFrame loop and half a megabyte of map, so it
+// is imported the first time you open it and torn down the moment you leave.
+// A course without the `game` feature never loads a byte of it.
+let gameMod = null;
+onScreen(async (id) => {
+  if (id === 'game') {
+    if (!content.has('game')) return;
+    try {
+      if (!gameMod) gameMod = await import('./game/screen.js');
+      gameMod.start(content.game);
+    } catch (e) {
+      console.error(e);
+      toast('Granada could not start on this device.');
+    }
+  } else if (gameMod) {
+    gameMod.stop();
+  }
+});
+
 boot().catch((e) => {
   console.error(e);
   splashSays('Something went wrong');

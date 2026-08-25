@@ -52,6 +52,9 @@ const rawBase = (lang) => contentBases(lang)[0];
 // Swiss German ends up with no verb trainer instead of a broken Spanish one.
 export const ALL_FEATURES = [
   'reader', 'scenes', 'review', 'verbs', 'order', 'words', 'patterns', 'audio',
+  // Granada. Only the Spanish course has it, and it is declared rather than
+  // inferred so the German one can never accidentally grow a Nicaraguan city.
+  'game',
 ];
 
 const CK = {
@@ -111,6 +114,7 @@ export const content = {
   phases: null,       // this course's own phase ladder
   ui: null,           // this course's interface strings
   icons: null,        // per-course tab icons, e.g. a gondola instead of a volcano
+  game: null,         // the missions and the street crowd, if this course has a game
 
   features() {
     const declared = this.manifest && this.manifest.features;
@@ -261,6 +265,7 @@ function applyBundle(lang, bundle, onProgress) {
     lessons: (bundle.lessons || []).map(asLesson),
     scenarios: (bundle.scenarios || []).map(asScenario),
     verbs: bundle.verbs || null,
+    game: bundle.game || null,
     // Declared by the course, not guessed from the language code, so a new
     // language ships its own mascot and its own ladder with no app release
     // beyond the artwork itself.

@@ -61,6 +61,7 @@ export function toast(msg, ms = 2600) {
 // declares nothing behaves exactly as it always did.
 const EN = {
   today: 'Today', path: 'Path', scenes: 'Scenes', words: 'Words',
+  game: 'Granada',
   review: 'Review', verbs: 'Verbs', order: 'Word order',
   listening: 'Listening', shadowing: 'Shadowing', patterns: 'Patterns',
   emergency: 'Emergency',
@@ -126,11 +127,18 @@ const TAB_DEFS = [
   { screen: 'today', icon: 'ic-today', label: 'today', feature: null },
   { screen: 'path', icon: 'ic-path', label: 'path', feature: 'reader' },
   { screen: 'scenes', icon: 'ic-scenes', label: 'scenes', feature: 'scenes' },
+  { screen: 'game', icon: 'ic-game', label: 'game', feature: 'game' },
   { screen: 'words', icon: 'ic-words', label: 'words', feature: 'words' },
 ];
 
 export function buildTabs(hasFeature, go, icons) {
+  // Granada takes the Scenes slot rather than adding a fifth tab: Scenes is
+  // already a tile on Today, so the tab was redundant the moment there was
+  // something better to put there. A course with scenes and no game keeps its
+  // Scenes tab exactly as before.
+  const swallowScenes = hasFeature('game');
   const tabs = TAB_DEFS
+    .filter((t2) => !(swallowScenes && t2.screen === 'scenes'))
     .filter((t2) => !t2.feature || hasFeature(t2.feature))
     .map((t2) => ({ ...t2, icon: (icons && icons[t2.screen]) || t2.icon }));
   for (const nav of document.querySelectorAll('nav.tabs')) {

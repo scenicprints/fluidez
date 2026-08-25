@@ -42,6 +42,15 @@ jobs:
       - name: Test the mascots
         run: node docs/js/creatures.test.mjs
 
+      # Granada cannot be played in CI and cannot be played from a terminal
+      # either, so the only way to know the city still works is to run it.
+      # This loads the real modules behind a stub DOM and checks that nobody is
+      # walled in, that the traffic stays on the road and that every beat is
+      # winnable with the app's own grader. It skips itself if the content repo
+      # is not checked out beside this one.
+      - name: Test Granada
+        run: node docs/js/game/game.test.mjs
+
       # Numbers only. The version is embedded in asset URLs, and a "+" in a
       # query string decodes as a space - which silently broke the app's
       # "am I up to date?" comparison and left an update banner showing

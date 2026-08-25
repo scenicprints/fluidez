@@ -36,7 +36,7 @@ function read(name, fallback) {
 // change worth blocking a pull over.
 const SYNCED = new Set([
   'vocab', 'progress', 'patterns', 'settings',
-  'streak', 'longest', 'lastActive', 'todayCount',
+  'streak', 'longest', 'lastActive', 'todayCount', 'game',
 ]);
 
 function stamp(ms = Date.now()) {
@@ -136,8 +136,14 @@ const BLANK_PROGRESS = {
   dictationCorrect: 0, dictationTotal: 0,
 };
 
+// Spreading a constant that holds arrays hands out the SAME array to
+// everybody, and markRead() then pushes into it. On a shared phone the second
+// user inherited the first one's stories until the page was reloaded, which is
+// exactly what namespacing by user id is supposed to prevent. Clone it.
+const blank = (o) => JSON.parse(JSON.stringify(o));
+
 export const progress = {
-  all: () => ({ ...BLANK_PROGRESS, ...read('progress', {}) }),
+  all: () => ({ ...blank(BLANK_PROGRESS), ...read('progress', {}) }),
   save: (p) => write('progress', p),
   bump(field, by = 1) {
     const p = this.all();
@@ -240,6 +246,42 @@ export const settings = {
   get(k) { return this.all()[k]; },
 };
 
+// ── the game ────────────────────────────────────────────────
+// What Granada remembers about you: which missions you have finished, which
+// ones the street has told you about, how many times you have met each phrase
+// (that is what fades the help), and where you were standing.
+//
+// `heard` is the whole quest log. There are no map markers by design, so a
+// mission you have not been pointed at does not appear in the log at all —
+// you can still walk into it, it is simply not something you know about yet.
+const BLANK_GAME = { done: [], heard: [], seen: {}, at: null, track: null };
+
+export const game = {
+  all: () => ({ ...blank(BLANK_GAME), ...read('game', {}) }),
+  save: (g) => write('game', g),
+  finish(id) {
+    const g = this.all();
+    if (!g.done.includes(id)) { g.done.push(id); this.save(g); }
+    return g;
+  },
+  hear(ids) {
+    const g = this.all();
+    let any = false;
+    for (const id of ids || []) if (!g.heard.includes(id)) { g.heard.push(id); any = true; }
+    if (any) this.save(g);
+    return g;
+  },
+  /** One more meeting with a phrase. The help ladder reads this. */
+  met(keyPhrase) {
+    const g = this.all();
+    g.seen[keyPhrase] = (g.seen[keyPhrase] || 0) + 1;
+    this.save(g);
+    return g.seen[keyPhrase];
+  },
+  where(x, y) { const g = this.all(); g.at = { x, y }; this.save(g); },
+  tracking(id) { const g = this.all(); g.track = id || null; this.save(g); },
+};
+
 // ── the whole picture, for syncing ──────────────────────────
 export function snapshot() {
   return {
@@ -251,6 +293,7 @@ export function snapshot() {
     longest: daily.longest(),
     lastActive: daily.lastActive(),
     todayCount: read('todayCount', 0),
+    game: game.all(),
     updatedAt: lastChanged(),
   };
 }
@@ -266,6 +309,7 @@ export function restore(snap) {
   if (typeof snap.longest === 'number') write('longest', snap.longest);
   if (snap.lastActive) write('lastActive', snap.lastActive);
   if (typeof snap.todayCount === 'number') write('todayCount', snap.todayCount);
+  if (snap.game) write('game', snap.game);
   // Adopt the cloud's own stamp, not "now". The device has not changed
   // anything, it has caught up — so the next comparison must still be able to
   // tell that a third device pushing later is newer than this.

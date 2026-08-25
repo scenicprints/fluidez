@@ -914,3 +914,129 @@ button.setrow:active { border-color: var(--oro-d); background: var(--ceniza2); }
 [data-course="de-ch"] .tile .ic { stroke: url(#chromeGrad); color: transparent; }
 [data-course="de-ch"] .tab.on { color: #FFFFFF; }
 [data-course="de-ch"] .tab.on .ti { stroke: url(#chromeGrad); }
+
+/* ══ GRANADA ═══════════════════════════════════════════════
+   The game screen. Everything is scoped to #sc-game so the world cannot reach
+   the rest of the app, and so the app's own .tile and .pad — which mean
+   something else entirely — cannot reach the world. The dialogue deliberately
+   reuses .es .en .who .go .fb .chip: the mockup was built from this stylesheet
+   in the first place, so those already mean exactly the right thing. */
+/* display comes from .screen — do not restate it here */
+#sc-game .gamewrap { position: relative; flex: 1; min-height: 0; background: #6E5B45; overflow: hidden; }
+#sc-game canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; touch-action: none; }
+
+/* the HUD — one quiet line, tap for the log */
+.gamehud {
+  position: absolute; top: 10px; left: 10px; z-index: 3;
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 11px 7px 13px; border-radius: 13px;
+  background: rgba(20,16,14,.72); border: 1px solid var(--linea);
+  color: var(--txt); font: inherit; font-size: 12.5px; cursor: pointer;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.gamehud:active { background: rgba(20,16,14,.92); }
+.gamehud .gh-where { font-weight: 600; }
+.gamehud .gh-count { color: var(--txt2); font-variant-numeric: tabular-nums; }
+.gamehud .gh-ic { width: 15px; height: 15px; color: var(--oro); }
+
+#sc-game .prompt {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 2;
+  background: rgba(20,16,14,.9); border: 1px solid var(--oro-d); border-radius: 12px;
+  padding: 7px 13px; font-size: 12.5px; color: var(--papel); white-space: nowrap;
+  opacity: 0; transition: opacity .18s; pointer-events: none;
+}
+#sc-game .prompt.on { opacity: 1; }
+
+/* controls */
+#sc-game .gpad {
+  flex: none; padding: 12px 16px 10px; display: flex;
+  align-items: center; justify-content: space-between;
+  background: var(--basalt); border-top: 1px solid var(--linea);
+}
+#sc-game .dpad { display: grid; grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 42px); }
+#sc-game .dbtn {
+  border: 1px solid var(--linea); background: var(--ceniza); color: var(--txt2);
+  font: inherit; font-size: 15px; cursor: pointer; display: grid; place-items: center;
+  touch-action: none;
+}
+#sc-game .dbtn:active, #sc-game .dbtn.held { background: var(--ceniza2); color: var(--oro); }
+#sc-game .dbtn.u { grid-area: 1/2; border-radius: 10px 10px 0 0; }
+#sc-game .dbtn.l { grid-area: 2/1; border-radius: 10px 0 0 10px; }
+#sc-game .dbtn.r { grid-area: 2/3; border-radius: 0 10px 10px 0; }
+#sc-game .dbtn.d { grid-area: 3/2; border-radius: 0 0 10px 10px; }
+#sc-game .dmid { grid-area: 2/2; background: var(--ceniza); border-top: 1px solid var(--linea); border-bottom: 1px solid var(--linea); }
+#sc-game .abtn {
+  width: 72px; height: 72px; border-radius: 50%; border: 1px solid var(--oro-d);
+  background: radial-gradient(circle at 34% 30%, #3A2A14, #1B1410);
+  color: var(--txt3); font: inherit; font-size: 12px; font-weight: 700;
+  letter-spacing: .08em; cursor: pointer; text-transform: uppercase;
+}
+#sc-game .abtn.live { color: var(--oro); border-color: var(--oro); box-shadow: 0 0 0 4px rgba(232,163,61,.13); }
+
+/* the quest log */
+.gamelog { position: absolute; inset: 0; z-index: 6; background: rgba(8,6,5,.7); display: none; }
+.gamelog.on { display: block; }
+.gamelog .gl-panel {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  background: var(--basalt2);
+}
+.gl-top { flex: none; display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 12px; border-bottom: 1px solid var(--linea); }
+.gl-top > div { flex: 1; min-width: 0; }
+.gl-title { font-family: var(--serif); font-size: 19px; color: var(--oro); }
+.gl-sub { font-size: 12px; color: var(--txt3); line-height: 1.45; margin-top: 3px; }
+.gl-body { flex: 1; overflow-y: auto; padding: 12px 14px 24px; -webkit-overflow-scrolling: touch; }
+.log-empty { padding: 26px 8px; color: var(--txt2); font-size: 13.5px; line-height: 1.6; }
+.log-empty b { display: block; color: var(--txt); margin-bottom: 7px; font-size: 15px; }
+.log-district { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--oro); margin: 16px 2px 8px; }
+.log-row {
+  display: block; width: 100%; text-align: left; margin-bottom: 8px;
+  padding: 12px 14px; border-radius: 13px; cursor: pointer;
+  background: var(--ceniza); border: 1px solid var(--linea); color: inherit; font: inherit;
+}
+.log-row.tracked { border-color: var(--oro-d); background: rgba(232,163,61,.08); }
+.log-row.done { opacity: .55; }
+.log-who { font-family: var(--serif); font-size: 16px; color: var(--txt); }
+.log-goal { font-size: 12.5px; color: var(--txt2); margin-top: 3px; line-height: 1.45; }
+.log-said { font-family: var(--serif); font-size: 13px; color: var(--txt3); margin-top: 7px; line-height: 1.5; }
+.log-tag { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--txt3); margin-top: 8px; }
+.log-row.tracked .log-tag { color: var(--oro); }
+.log-row.done .log-tag { color: var(--jade); }
+
+/* the dialogue */
+#sc-game .talk { position: absolute; inset: 0; z-index: 5; background: rgba(8,6,5,.66); display: none; flex-direction: column; justify-content: flex-end; }
+#sc-game .talk.on { display: flex; }
+#sc-game .panel {
+  background: var(--basalt); border-top: 1px solid var(--linea);
+  border-radius: 20px 20px 0 0; padding: 16px 16px 20px;
+  max-height: 100%; overflow-y: auto;
+}
+#sc-game .says-es { font-family: var(--serif); font-size: 19px; line-height: 1.4; color: var(--txt); }
+#sc-game .objective { font-size: 12.5px; color: var(--oro); margin: 13px 0 0; }
+#sc-game .help { border-radius: 13px; padding: 11px 13px; margin: 10px 0 12px; border: 1px dashed var(--oro-d); background: rgba(232,163,61,.06); }
+#sc-game .help .lab { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--oro); margin-bottom: 5px; }
+#sc-game .help .en { font-size: 12px; color: var(--txt2); }
+#sc-game .help.hint { border-color: var(--linea); background: rgba(255,255,255,.02); }
+#sc-game .help.hint .lab { color: var(--txt3); }
+#sc-game .help.cold { border: 0; background: none; padding: 0; margin: 12px 0 10px; }
+#sc-game .help.cold .lab { color: var(--jade); }
+#sc-game .built { min-height: 50px; border-bottom: 2px solid var(--linea); padding: 6px 2px 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; margin-bottom: 12px; }
+#sc-game .ghost { font-size: 13px; color: var(--txt3); padding: 8px 2px; }
+#sc-game .tray { display: flex; flex-wrap: wrap; gap: 7px; min-height: 40px; }
+#sc-game .gtile {
+  font-family: var(--serif); font-size: 17px; line-height: 1;
+  background: var(--ceniza2); color: var(--papel);
+  border: 1px solid var(--linea); border-bottom-width: 3px;
+  border-radius: 10px; padding: 10px 12px; cursor: pointer;
+}
+#sc-game .gtile:active { transform: translateY(1px); border-bottom-width: 2px; }
+#sc-game .gtile.placed { background: rgba(232,163,61,.12); border-color: var(--oro-d); }
+#sc-game .row { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+#sc-game .peek { flex: 1; background: none; border: 0; color: var(--txt3); font: inherit; font-size: 12px; cursor: pointer; padding: 0; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+#sc-game .peeked { font-family: var(--serif); font-size: 18px; color: var(--txt2); padding: 2px 0 12px; flex: 1; }
+#sc-game .go { flex: none; }
+#sc-game .go.jade { width: 100%; margin-top: 12px; }
+#sc-game .fb { display: block; margin-top: 11px; font-size: 12.5px; }
+#sc-game .fb.good { background: rgba(52,179,150,.13); border: 1px solid var(--jade-d); color: #9FE3CE; }
+#sc-game .fb.bad { background: rgba(217,97,63,.12); border: 1px solid var(--barro-d); color: #F0AE95; }
+#sc-game .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#sc-game .chip { cursor: default; border-color: var(--oro-d); color: var(--oro); background: rgba(232,163,61,.07); font-size: 14px; padding: 4px 10px; border-bottom-width: 1px; }
