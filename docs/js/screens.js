@@ -3,11 +3,11 @@
 // Rendering is deliberately dumb: each screen redraws from the store whenever
 // it is shown, so there is no view state to get out of sync with progress.
 
-import { $, el, clear, esc, md, showScreen, toast, initials, ago, bytes, t } from './ui.js';
+import { $, el, clear, esc, md, showScreen, screenNow, toast, initials, ago, bytes, t } from './ui.js';
 import * as store from './store.js';
 import * as cloud from './cloud.js';
 import * as speech from './speech.js';
-import { content, lessonsByPhase, checkForContentUpdate, cacheSize, packVersion, resolve, underConstruction } from './content.js';
+import { content, lessonsByPhase, checkForContentUpdate, cacheSize, packVersion, resolve, underConstruction, loadLanguages } from './content.js';
 import { mascotMini, mascotSvg, createMascot, daysBetween } from './mascot.js';
 import {
   memoryStrength, band, calcFluency, fadingWords, dueWords, dueCount, leeches, tokenize, cleanWord,
@@ -86,6 +86,10 @@ function playPending(m, events, startAfter = 2600) {
 }
 
 // ── header bits shared by several screens ───────────────────
+/** Repaint the chips after something out-of-band changes — the registry
+ *  arriving over the network, for one. */
+export function paintChrome() { paintLevel(); }
+
 function paintLevel() {
   const f = fluency();
   for (const id of ['levelChip', 'levelChip2', 'levelChip3', 'levelChip4']) {
@@ -1629,6 +1633,14 @@ let onSwitchLanguage = () => {};
 export function setSettingsHandlers(h) { onSignOut = h.signOut; onSwitchLanguage = h.switchLanguage; }
 
 export function renderSettings() {
+  // Belt and braces on the registry deadlock: if this device still only
+  // knows one language, ask the network while the screen is open and
+  // re-render the moment a second one appears — this row is the switcher.
+  if (content.languages.length < 2) {
+    loadLanguages().then((list) => {
+      if (list.length > 1 && screenNow() === 'settings') renderSettings();
+    });
+  }
   const pad = $('settingsPad');
   clear(pad);
   $('settingsSub').textContent = `${session.name} · ${session.userId}`;

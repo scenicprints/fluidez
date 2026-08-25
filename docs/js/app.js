@@ -321,6 +321,13 @@ async function boot() {
 
   if (lang && loadCachedPack(code)) {
     launch({ userId, name: session.name });
+    // The registry was read from CACHE ONLY above, for offline speed — which
+    // deadlocked every existing install: the switchers hide themselves while
+    // the cached list holds one language, and the only path that refetched
+    // the list with network was behind those switchers. So a new language
+    // could never reach a device that had already booted once. Refresh it in
+    // the background and repaint the chip when it lands.
+    loadLanguages().then(() => screens.paintChrome());
     // Catch up with the cloud quietly, without holding anything up.
     // Compare against the PERSISTED stamp of the last local change, never a
     // freshly minted Date.now() — that comparison is always false, which is
