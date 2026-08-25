@@ -672,6 +672,10 @@ WANTED = {
     u'Reparto Germ\xe1n Pomares': 'pantanal',
     u'Carlos M. Marenco': 'pantanal',
     u'Centro Turistico': 'malecon',
+    # Afuera is Masaya, Catarina, Mombacho and the Laguna, all of which are
+    # off the map by design. This is the road west out of town towards every
+    # one of them, so it is where you meet the people who are going there.
+    u'Camino a la Laguna': 'afuera',
     # Granada has two bus terminals: the international one by the old station
     # and this one, which is where you actually get a bus to Managua.
     u'Terminal de buses Granada - Managua (UCA)': 'terminal',
