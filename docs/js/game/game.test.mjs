@@ -125,8 +125,15 @@ function makeTile(dataId, text) {
   };
 }
 
+// Ids that are to behave as if they are not in the page at all. The stub
+// conjures any element you ask it for, which is convenient and also means it
+// can never notice a control that index.html does not actually have — the one
+// class of bug that bricks the whole screen.
+const absent = new Set();
+
 globalThis.document = {
-  getElementById: (id) => nodes.get(id) || (nodes.set(id, makeEl(id)), nodes.get(id)),
+  getElementById: (id) => (absent.has(id) ? null
+    : nodes.get(id) || (nodes.set(id, makeEl(id)), nodes.get(id))),
   createElement: () => makeEl('canvas'),
   querySelectorAll: () => [],
   addEventListener() {},
@@ -623,17 +630,57 @@ test('a beat you have already won cannot be sent a second time', () => {
 });
 
 // ── the street ──────────────────────────────────────────────
-test('there are people on the street, and they stay out of the walls', () => {
+test('there are people on the street, and none of them is on a roof or in the lake', () => {
+  // This check is deliberately NOT world.canStand or world.bodyFits. Asserting
+  // the same function the movement code guards itself with proves only that it
+  // called itself, and that is what the first version of this test did — it
+  // passed happily while people walked with half their body over a roof and out
+  // across the water, because only the single point under their feet was ever
+  // tested. Here the tiles a drawn person actually covers are read straight off
+  // the grid.
   store.setUser('folk');
   screen.start({ missions, crowd });
   const w = W2();
-  for (let i = 0; i < 400; i++) screen.__test.frame(i * 16);
-  assert.ok(w.S.walkers.length >= 10, `only ${w.S.walkers.length} people about`);
-  for (const p of w.S.walkers) {
-    assert.ok(Number.isFinite(p.px) && Number.isFinite(p.py), 'a walker went to NaN');
-    assert.ok(w.canStand(p.px, p.py), 'somebody is walking through a building');
+  const bad = [];
+  for (let i = 0; i < 900; i++) {
+    screen.__test.frame(i * 16);
+    if (i % 25) continue;
+    for (const p of w.S.walkers) {
+      if (p.px === undefined) continue;
+      assert.ok(Number.isFinite(p.px) && Number.isFinite(p.py), 'a walker went to NaN');
+      // The sprite: ten px across, head fourteen up, feet four down.
+      for (const [dx, dy] of [[-4, 4], [4, 4], [-4, -12], [4, -12], [0, 0]]) {
+        const t = w.at(Math.floor((p.px + dx) / TS), Math.floor((p.py + dy) / TS));
+        if (SOLID.has(t)) bad.push(`tile ${t} at ${Math.round(p.px)},${Math.round(p.py)}`);
+      }
+    }
   }
-  screen.stop();
+  assert.ok(w.S.walkers.length >= 6, `only ${w.S.walkers.length} people about`);
+  assert.deepEqual(bad.slice(0, 4), [], `${bad.length} sightings of somebody inside solid ground`);
+});
+
+test('the street is populated, but it is not a rush hour', () => {
+  // Kevin, on the first attempt: "I think there are too many to be honest."
+  // Granada is a quiet provincial city. This is the number he sees, so it is
+  // worth pinning rather than leaving to drift.
+  store.setUser('howmany');
+  screen.start({ missions, crowd });
+  const w = W2();
+  const SCALE = 1.35, hw = 390 / SCALE / 2, hh = 560 / SCALE / 2;
+  let seen = 0, samples = 0;
+  for (let i = 0; i < 900; i++) {
+    screen.__test.frame(i * 16);
+    if (i % 25) continue;
+    samples++;
+    seen += w.S.walkers.filter((p) => p.px !== undefined &&
+      Math.abs(p.px - w.S.px) < hw && Math.abs(p.py - w.S.py) < hh).length;
+  }
+  // Measured standing at the spawn, which is Parque Central — the busiest
+  // square in Granada and the most crowded reading you can get. Walking the
+  // ordinary streets is about three. The band is wide on purpose: this is here
+  // to catch a deserted city or a rush hour, not to pin a number.
+  const avg = seen / samples;
+  assert.ok(avg >= 1 && avg <= 8, `${avg.toFixed(1)} passers-by on screen at a time`);
 });
 
 test('a passer-by is never mistaken for somebody you can talk to', () => {
@@ -678,6 +725,38 @@ test('the map does not survive leaving the screen either', () => {
   document.getElementById('gameMapBtn').fire('click');
   screen.stop();
   assert.ok(!document.getElementById('gameMap').classList.contains('on'));
+});
+
+test('a missing control does not take the whole game down with it', () => {
+  // Every one of these is bound in wireControls, which used to do
+  // `$(id).addEventListener` with no guard and set `wired` before it started —
+  // so ONE absent button threw, the stick and the keyboard were never wired,
+  // and it never tried again. You could not walk and you could not talk.
+  //
+  // A stale cached index.html against fresh JavaScript is exactly how that
+  // happens in the wild, and the service worker was matching cached assets with
+  // `ignoreSearch: true`, which threw away the ?v= that made a build unique.
+  const CONTROLS = ['gameMapClear', 'gameMapIn', 'gameMapOut', 'gameMapBtn',
+                    'gameMapClose', 'gameHud', 'gameLogClose', 'gameMapCanvas'];
+  for (const id of CONTROLS) {
+    screen.__test.unwire();
+    nodes.clear();
+    absent.add(id);
+    try {
+      store.setUser('missing-' + id);
+      standOn(withBeats.id);
+      screen.start({ missions, crowd });
+      assert.ok(screen.isRunning(), `#${id} missing stopped the game starting`);
+      document.getElementById('gameA').fire('click');
+      assert.ok(document.getElementById('gameTalk').classList.contains('on'),
+        `with #${id} missing, the A button is dead`);
+      screen.stop();
+    } finally {
+      absent.delete(id);
+      nodes.clear();
+      screen.__test.unwire();
+    }
+  }
 });
 
 // ── zoom, pan and the pin ───────────────────────────────────

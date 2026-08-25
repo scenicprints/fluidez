@@ -185,6 +185,23 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
     return !!REACH[ty * W + tx];
   }
 
+  /**
+   * Is a whole PERSON clear here, not just the point they stand on?
+   *
+   * A person is about ten pixels across and their head is fourteen above their
+   * feet, on sixteen-pixel tiles. Testing the middle point alone let a walker
+   * stand with their centre legally on the last strip of a pavement and their
+   * body over the roof next door or out across the water — which is exactly
+   * what it looked like. The player has always been tested at four corners;
+   * so is everybody else now.
+   */
+  function bodyFits(px, py) {
+    if (!canStand(px, py)) return false;
+    const solidAt = (x, y) => SOLID.has(at(Math.floor(x / TS), Math.floor(y / TS)));
+    return !solidAt(px - 4, py + 4) && !solidAt(px + 4, py + 4) &&
+           !solidAt(px - 4, py - 12) && !solidAt(px + 4, py - 12);
+  }
+
   const taken = new Set([START.x + ',' + START.y]);
   function standing(tx, ty) {
     for (let r = 0; r < 70; r++) {
@@ -296,9 +313,13 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
   // The numbers matter more than they look. A phone shows about 290 x 416 px of
   // city, which is 2.5% of a disc 1250 px across — so the first attempt, with
   // eighteen people spread over that disc, put 0.4 of a person on screen and
-  // the street still read as deserted. The count is set from the area instead:
-  // roughly one passer-by per 20,000 px², which is four to six of them in view.
-  const FOLK = 40;          // simulated at once, near you
+  // the street still read as deserted.
+  //
+  // Then forty was too many: Kevin, "I think there are too many to be honest."
+  // Granada is a quiet provincial city, not a rush hour. Sixteen puts two or
+  // three in view at a time — enough that the street is never dead, few enough
+  // that the ones with something to say still stand out.
+  const FOLK = 16;          // simulated at once, near you
   const FOLK_KEEP = 520;    // px from the player before one is recycled
   const FOLK_NEAR = 300;    // a recycled one comes back from off screen
 
@@ -316,7 +337,7 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
         ? Math.sqrt(Math.random()) * (FOLK_KEEP - 40)     // sqrt: evenly by AREA
         : FOLK_NEAR + Math.random() * (FOLK_KEEP - FOLK_NEAR - 40);
       const px = S.px + Math.cos(ang) * rad, py = S.py + Math.sin(ang) * rad;
-      if (!canStand(px, py)) continue;
+      if (!bodyFits(px, py)) continue;
       w.px = px; w.py = py;
       w.skin = SKIN[(Math.random() * SKIN.length) | 0];
       w.shirt = SHIRT[(Math.random() * SHIRT.length) | 0];
@@ -347,12 +368,12 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
       // Corners are turned, not walked through. Try the whole step, then each
       // axis on its own, so a wall makes somebody slide along it like a person
       // rather than stop dead against it.
-      if (canStand(nx, ny)) {
+      if (bodyFits(nx, ny)) {
         w.px = nx; w.py = ny;
-      } else if (canStand(nx, w.py)) {
+      } else if (bodyFits(nx, w.py)) {
         w.px = nx;
         w.ang = Math.cos(w.ang) > 0 ? 0 : Math.PI;          // slide along the wall
-      } else if (canStand(w.px, ny)) {
+      } else if (bodyFits(w.px, ny)) {
         w.py = ny;
         w.ang = Math.sin(w.ang) > 0 ? Math.PI / 2 : -Math.PI / 2;
       } else {
@@ -504,7 +525,7 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
 
   return {
     map, S, people, districts, TS, W, H, at, spot,
-    move, traffic, folk, nearest, districtNow, pointOn, canStand, START,
+    move, traffic, folk, nearest, districtNow, pointOn, canStand, bodyFits, START,
     tint, grid, FACES, ROOFS,
   };
 }

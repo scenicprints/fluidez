@@ -39,6 +39,9 @@ export function isRunning() { return !!G; }
 export const __test = {
   world: () => G && G.world,
   frame: (t) => { if (G) frame(t); },
+  // Controls are wired once per page. A test that wants to see what happens
+  // when one of them is missing has to be able to ask for that once more.
+  unwire: () => { wired = false; },
 };
 
 /**
@@ -908,16 +911,31 @@ function wireControls() {
   // copy of every listener, which is how one tap starts opening the quest log
   // twice.
   if (wired) return;
-  wired = true;
 
-  $('gameA').addEventListener('click', tryTalk);
-  $('gameHud').addEventListener('click', openLog);
-  $('gameLogClose').addEventListener('click', closeLog);
-  $('gameMapBtn').addEventListener('click', openMap);
-  $('gameMapClose').addEventListener('click', closeMap);
-  $('gameMapClear').addEventListener('click', () => dropPin(null, null));
-  $('gameMapIn').addEventListener('click', () => mapZoom(1.6));
-  $('gameMapOut').addEventListener('click', () => mapZoom(1 / 1.6));
+  // Bind through this, never `$(id).addEventListener` directly.
+  //
+  // A missing element made `$(id)` null and the whole of this function threw on
+  // the spot — and because `wired` was set at the TOP, it never ran again. One
+  // absent button and the game is bricked for the session: no walking, no
+  // keyboard, and nothing to talk to. That is far too much to lose over a
+  // control that is merely missing, and it is invisible to game.test.mjs,
+  // whose stub DOM conjures any element you ask it for.
+  const on = (id, ev, fn, opts) => {
+    const el = document.getElementById(id);
+    if (!el) { console.warn(`Granada: no #${id} to bind ${ev} to`); return; }
+    el.addEventListener(ev, fn, opts);
+  };
+
+  // Walking and talking first, so they are never the casualty of anything
+  // added below them.
+  on('gameA', 'click', tryTalk);
+  on('gameHud', 'click', openLog);
+  on('gameLogClose', 'click', closeLog);
+  on('gameMapBtn', 'click', openMap);
+  on('gameMapClose', 'click', closeMap);
+  on('gameMapClear', 'click', () => dropPin(null, null));
+  on('gameMapIn', 'click', () => mapZoom(1.6));
+  on('gameMapOut', 'click', () => mapZoom(1 / 1.6));
 
   const mcv = $('gameMapCanvas');
   if (mcv) {
@@ -983,4 +1001,9 @@ function wireControls() {
   // The map sizes itself to the panel when it is painted, so a rotate with it
   // open would leave the city drawn for the old shape until you touched it.
   addEventListener('resize', () => { if (G) paintMap(); });
+
+  // Last, not first. If anything above still finds a way to throw, the next
+  // start() gets another go at wiring rather than the screen being dead for
+  // as long as the app is open.
+  wired = true;
 }

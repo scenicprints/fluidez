@@ -115,9 +115,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Everything else (our own assets, the pinned SDK): cache first.
+  // Everything else (our own assets, the pinned SDK): cache first, but ONLY on
+  // an exact match.
+  //
+  // This used to match with `ignoreSearch: true`, which threw away the `?v=`
+  // that CI stamps onto every asset — the entire point of which is to make a
+  // new build a new URL. So `screen.js?v=2.8.32` matched a cached
+  // `screen.js?v=2.8.30` and the app ran new markup against old code, or the
+  // other way about, with no version anywhere disagreeing. A mismatch like that
+  // does not look like a caching bug from the outside; it looks like a feature
+  // that stopped working.
+  //
+  // Offline still works: a request that misses and cannot be fetched falls back
+  // to whatever version of that file we do have, which is better than nothing.
   event.respondWith((async () => {
-    const hit = await caches.match(req, { ignoreSearch: true });
+    const hit = await caches.match(req);
     if (hit) return hit;
     try {
       const fresh = await fetch(req);
@@ -126,7 +138,8 @@ self.addEventListener('fetch', (event) => {
       }
       return fresh;
     } catch {
-      return new Response('', { status: 504 });
+      const anyVersion = await caches.match(req, { ignoreSearch: true });
+      return anyVersion || new Response('', { status: 504 });
     }
   })());
 });
