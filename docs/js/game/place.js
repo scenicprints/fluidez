@@ -7,628 +7,628 @@
 export const PLACE = {
  "afuera-01": {
   "at": "Camino a la Laguna",
-  "dx": 9,
-  "dy": -7
+  "dx": 25,
+  "dy": -20
  },
  "afuera-02": {
   "at": "Camino a la Laguna",
-  "dx": 16,
-  "dy": 5
+  "dx": 45,
+  "dy": 15
  },
  "afuera-03": {
   "at": "Camino a la Laguna",
-  "dx": 5,
-  "dy": 13
+  "dx": 15,
+  "dy": 35
  },
  "afuera-04": {
   "at": "Camino a la Laguna",
-  "dx": 22,
-  "dy": -4
+  "dx": 60,
+  "dy": -10
  },
  "afuera-05": {
   "at": "Camino a la Laguna",
-  "dx": 13,
-  "dy": 16
+  "dx": 35,
+  "dy": 45
  },
  "afuera-06": {
   "at": "Camino a la Laguna",
-  "dx": 25,
-  "dy": 9
+  "dx": 70,
+  "dy": 25
  },
  "afuera-07": {
   "at": "Camino a la Laguna",
-  "dx": 29,
-  "dy": -9,
+  "dx": 80,
+  "dy": -25,
   "vehicle": "camioneta"
  },
  "afuera-08": {
   "at": "Camino a la Laguna",
-  "dx": 18,
-  "dy": 20
+  "dx": 50,
+  "dy": 55
  },
  "barrio-01": {
   "at": "Parque Otra Banda",
-  "dx": -13,
-  "dy": 16
+  "dx": -38,
+  "dy": 45
  },
  "barrio-02": {
   "at": "Parque Otra Banda",
-  "dx": -13,
-  "dy": 21
+  "dx": -38,
+  "dy": 60
  },
  "barrio-03": {
   "at": "Parque Otra Banda",
-  "dx": 18,
-  "dy": 13
+  "dx": 52,
+  "dy": 38
  },
  "barrio-04": {
   "at": "Parque Otra Banda",
-  "dx": -23,
-  "dy": -8
+  "dx": -68,
+  "dy": -22
  },
  "barrio-05": {
   "at": "Parque Otra Banda",
-  "dx": 8,
-  "dy": -18
+  "dx": 22,
+  "dy": -52
  },
  "barrio-06": {
   "at": "Parque Otra Banda",
-  "dx": 26,
-  "dy": -10
+  "dx": 75,
+  "dy": -30
  },
  "barrio-07": {
   "at": "Parque Otra Banda",
-  "dx": -8,
-  "dy": 26,
+  "dx": -22,
+  "dy": 75,
   "vehicle": "bici"
  },
  "barrio-08": {
   "at": "Parque Otra Banda",
-  "dx": -18,
-  "dy": 31
+  "dx": -52,
+  "dy": 90
  },
  "barrio-09": {
   "at": "Parque Otra Banda",
-  "dx": 31,
-  "dy": 18,
+  "dx": 90,
+  "dy": 52,
   "vehicle": "camioneta"
  },
  "barrio-10": {
   "at": "Parque Otra Banda",
-  "dx": 13,
-  "dy": 34
+  "dx": 38,
+  "dy": 98
  },
  "barrio-11": {
   "at": "Parque Otra Banda",
-  "dx": -31,
-  "dy": 10
+  "dx": -90,
+  "dy": 30
  },
  "barrio-12": {
   "at": "Parque Otra Banda",
-  "dx": 23,
-  "dy": -23
+  "dx": 68,
+  "dy": -68
  },
  "barrio-13": {
   "at": "Parque Otra Banda",
-  "dx": -16,
-  "dy": 26
+  "dx": -45,
+  "dy": 75
  },
  "barrio-14": {
   "at": "Parque Otra Banda",
-  "dx": 5,
-  "dy": 8
+  "dx": 15,
+  "dy": 22
  },
  "centro-01": {
   "at": "Parque Central",
-  "dx": -24,
-  "dy": 14
+  "dx": -98,
+  "dy": 56
  },
  "centro-02": {
   "at": "Catedral",
-  "dx": 20,
-  "dy": 7
+  "dx": 84,
+  "dy": 28
  },
  "centro-03": {
   "at": "Catedral",
-  "dx": 41,
-  "dy": 5
+  "dx": 168,
+  "dy": 21
  },
  "centro-04": {
   "at": "Parque Central",
-  "dx": 5,
-  "dy": -7
+  "dx": 21,
+  "dy": -28
  },
  "centro-05": {
   "at": "Palacio Municipal",
-  "dx": 10,
-  "dy": 12,
+  "dx": 42,
+  "dy": 49,
   "vehicle": "moto"
  },
  "centro-06": {
   "at": "Catedral",
   "dx": 0,
-  "dy": 12
+  "dy": 49
  },
  "centro-07": {
   "at": "Palacio Municipal",
-  "dx": -15,
-  "dy": 3
+  "dx": -63,
+  "dy": 14
  },
  "centro-08": {
   "at": "Parque Central",
-  "dx": 19,
-  "dy": 15
+  "dx": 77,
+  "dy": 63
  },
  "centro-09": {
   "at": "Plaza la Fuente",
-  "dx": -8,
-  "dy": 7
+  "dx": -35,
+  "dy": 28
  },
  "centro-10": {
   "at": "Parque Central",
-  "dx": -7,
-  "dy": -12
+  "dx": -28,
+  "dy": -49
  },
  "centro-11": {
   "at": "Plazuela de los Leones",
-  "dx": 7,
-  "dy": 10
+  "dx": 28,
+  "dy": 42
  },
  "centro-12": {
   "at": "Parque Central",
-  "dx": 14,
-  "dy": -3
+  "dx": 56,
+  "dy": -14
  },
  "fiestas-01": {
   "at": "Parroquia Nuestra Señora del Socorro",
-  "dx": -11,
-  "dy": 9
+  "dx": -33,
+  "dy": 28
  },
  "fiestas-02": {
   "at": "Parroquia Nuestra Señora del Socorro",
-  "dx": 13,
-  "dy": 7
+  "dx": 38,
+  "dy": 22
  },
  "fiestas-03": {
   "at": "Parroquia Nuestra Señora del Socorro",
-  "dx": -7,
-  "dy": -13
+  "dx": -22,
+  "dy": -38
  },
  "fiestas-04": {
   "at": "Iglesia Vieja Ermita El Socorro",
-  "dx": 14,
-  "dy": 11
+  "dx": 44,
+  "dy": 33
  },
  "fiestas-05": {
   "at": "Iglesia Vieja Ermita El Socorro",
-  "dx": -13,
-  "dy": 9
+  "dx": -38,
+  "dy": 28
  },
  "fiestas-06": {
   "at": "Iglesia Vieja Ermita El Socorro",
-  "dx": 9,
-  "dy": -11
+  "dx": 28,
+  "dy": -33
  },
  "fiestas-07": {
   "at": "Parroquia Nuestra Señora del Socorro",
-  "dx": 20,
-  "dy": -5
+  "dx": 60,
+  "dy": -16
  },
  "fiestas-08": {
   "at": "Parroquia Nuestra Señora del Socorro",
-  "dx": 4,
-  "dy": 18
+  "dx": 11,
+  "dy": 55
  },
  "guadalupe-01": {
   "at": "Iglesia de Nuestra Señora de Guadalupe",
-  "dx": -25,
-  "dy": 14
+  "dx": -68,
+  "dy": 38
  },
  "guadalupe-02": {
   "at": "Iglesia de Nuestra Señora de Guadalupe",
-  "dx": 28,
-  "dy": 20,
+  "dx": 75,
+  "dy": 52,
   "vehicle": "moto"
  },
  "guadalupe-03": {
   "at": "Iglesia de Nuestra Señora de Guadalupe",
-  "dx": -17,
-  "dy": -25
+  "dx": -45,
+  "dy": -68
  },
  "guadalupe-04": {
   "at": "Iglesia de Nuestra Señora de Guadalupe",
-  "dx": 17,
-  "dy": -20
+  "dx": 45,
+  "dy": -52
  },
  "guadalupe-05": {
   "at": "Iglesia de Nuestra Señora de Guadalupe",
-  "dx": -34,
-  "dy": -6
+  "dx": -90,
+  "dy": -15
  },
  "guadalupe-06": {
   "at": "Iglesia de Nuestra Señora de Guadalupe",
-  "dx": 8,
-  "dy": 31
+  "dx": 22,
+  "dy": 82
  },
  "guadalupe-07": {
   "at": "Iglesia de Nuestra Señora de Guadalupe",
-  "dx": 34,
-  "dy": -8
+  "dx": 90,
+  "dy": -22
  },
  "guadalupe-08": {
   "at": "Iglesia de Nuestra Señora de Guadalupe",
-  "dx": -8,
-  "dy": 25
+  "dx": -22,
+  "dy": 68
  },
  "guadalupe-09": {
   "at": "Iglesia de Nuestra Señora de Guadalupe",
-  "dx": 25,
-  "dy": 36
+  "dx": 68,
+  "dy": 98
  },
  "guadalupe-10": {
   "at": "Iglesia de Nuestra Señora de Guadalupe",
-  "dx": -28,
-  "dy": 34
+  "dx": -75,
+  "dy": 90
  },
  "malecon-01": {
   "at": "Centro Turistico",
-  "dx": -8,
-  "dy": 10
+  "dx": -22,
+  "dy": 27
  },
  "malecon-02": {
   "at": "Centro Turistico",
-  "dx": 14,
-  "dy": 15,
+  "dx": 27,
+  "dy": 40,
   "vehicle": "lancha"
  },
  "malecon-03": {
   "at": "Centro Turistico",
-  "dx": -14,
-  "dy": -7
+  "dx": -36,
+  "dy": -18
  },
  "malecon-04": {
   "at": "Centro Turistico",
-  "dx": 5,
-  "dy": 20
+  "dx": -14,
+  "dy": 54
  },
  "malecon-05": {
   "at": "Centro Turistico",
-  "dx": 19,
-  "dy": -8
+  "dx": -27,
+  "dy": -54
  },
  "malecon-06": {
   "at": "Centro Turistico",
-  "dx": -19,
-  "dy": 15
+  "dx": -50,
+  "dy": 40
  },
  "malecon-07": {
   "at": "Centro Turistico",
-  "dx": 24,
-  "dy": 7
+  "dx": -40,
+  "dy": 72
  },
  "malecon-08": {
   "at": "Centro Turistico",
-  "dx": -5,
-  "dy": -15,
+  "dx": -14,
+  "dy": -40,
   "vehicle": "lancha"
  },
  "mercado-01": {
   "at": "Mercado Municipal",
-  "dx": -18,
-  "dy": 10
+  "dx": -52,
+  "dy": 30
  },
  "mercado-02": {
   "at": "Mercado Municipal",
-  "dx": 23,
-  "dy": -18
+  "dx": 68,
+  "dy": -52
  },
  "mercado-03": {
   "at": "Mercado Municipal",
-  "dx": 10,
-  "dy": 16
+  "dx": 30,
+  "dy": 45
  },
  "mercado-04": {
   "at": "Mercado Municipal",
-  "dx": -13,
-  "dy": 23
+  "dx": -38,
+  "dy": 68
  },
  "mercado-05": {
   "at": "Mercado Municipal",
-  "dx": 29,
-  "dy": 18
+  "dx": 82,
+  "dy": 52
  },
  "mercado-06": {
   "at": "Mercado Municipal",
-  "dx": -26,
-  "dy": -10
+  "dx": -75,
+  "dy": -30
  },
  "mercado-07": {
   "at": "Mercado Municipal",
-  "dx": 16,
-  "dy": -21
+  "dx": 45,
+  "dy": -60
  },
  "mercado-08": {
   "at": "Mercado Municipal",
-  "dx": -8,
-  "dy": -26
+  "dx": -22,
+  "dy": -75
  },
  "mercado-09": {
   "at": "Mercado Municipal",
-  "dx": 21,
-  "dy": 26
+  "dx": 60,
+  "dy": 75
  },
  "mercado-10": {
   "at": "Mercado Municipal",
-  "dx": -23,
-  "dy": 21
+  "dx": -68,
+  "dy": 60
  },
  "mercado-11": {
   "at": "Supermercado Palí Granada",
-  "dx": 8,
-  "dy": 13
+  "dx": 22,
+  "dy": 38
  },
  "mercado-12": {
   "at": "Mercado Municipal",
-  "dx": 34,
-  "dy": 5
+  "dx": 98,
+  "dy": 15
  },
  "pantanal-01": {
   "at": "Centro Turistico",
-  "dx": 10,
-  "dy": 6,
+  "dx": 33,
+  "dy": 22,
   "vehicle": "lancha"
  },
  "pantanal-02": {
   "at": "Reparto Germán Pomares",
-  "dx": -10,
-  "dy": 6
+  "dx": -33,
+  "dy": 22
  },
  "pantanal-03": {
   "at": "Reparto Germán Pomares",
-  "dx": 11,
-  "dy": -8
+  "dx": 38,
+  "dy": -28
  },
  "pantanal-04": {
   "at": "Reparto Germán Pomares",
-  "dx": -14,
-  "dy": -5
+  "dx": -50,
+  "dy": -16
  },
  "pantanal-05": {
   "at": "Reparto Germán Pomares",
-  "dx": 5,
-  "dy": 13
+  "dx": 16,
+  "dy": 44
  },
  "pantanal-06": {
   "at": "Carlos M. Marenco",
-  "dx": -8,
-  "dy": 10
+  "dx": -28,
+  "dy": 33
  },
  "pantanal-07": {
   "at": "Carlos M. Marenco",
-  "dx": 13,
-  "dy": -6
+  "dx": 44,
+  "dy": -22
  },
  "pantanal-08": {
   "at": "Carlos M. Marenco",
-  "dx": -13,
-  "dy": -10
+  "dx": -44,
+  "dy": -33
  },
  "pantanal-09": {
   "at": "Reparto Germán Pomares",
-  "dx": 18,
-  "dy": 11
+  "dx": 60,
+  "dy": 38
  },
  "pantanal-10": {
   "at": "Carlos M. Marenco",
-  "dx": 6,
-  "dy": 16
+  "dx": 22,
+  "dy": 55
  },
  "terminal-01": {
   "at": "Transnica & King Quality",
-  "dx": -10,
-  "dy": 12,
+  "dx": -30,
+  "dy": 38,
   "vehicle": "bus"
  },
  "terminal-02": {
   "at": "Transnica & King Quality",
-  "dx": 14,
-  "dy": 12,
+  "dx": 45,
+  "dy": 38,
   "vehicle": "taxi"
  },
  "terminal-03": {
   "at": "Transnica & King Quality",
-  "dx": -14,
-  "dy": 17,
+  "dx": -45,
+  "dy": 52,
   "vehicle": "taxi"
  },
  "terminal-04": {
   "at": "Transnica & King Quality",
-  "dx": 5,
-  "dy": -14
+  "dx": 15,
+  "dy": -45
  },
  "terminal-05": {
   "at": "Transnica & King Quality",
-  "dx": 31,
-  "dy": -5,
+  "dx": 98,
+  "dy": -15,
   "vehicle": "bus"
  },
  "terminal-06": {
   "at": "Transnica & King Quality",
-  "dx": -22,
-  "dy": -7
+  "dx": -68,
+  "dy": -22
  },
  "terminal-07": {
   "at": "Transnica & King Quality",
-  "dx": 22,
-  "dy": -17
+  "dx": 68,
+  "dy": -52
  },
  "terminal-08": {
   "at": "Transnica & King Quality",
-  "dx": -29,
-  "dy": 10
+  "dx": -90,
+  "dy": 30
  },
  "terminal-09": {
   "at": "Transnica & King Quality",
-  "dx": 26,
-  "dy": 5,
+  "dx": 82,
+  "dy": 15,
   "vehicle": "bus"
  },
  "terminal-10": {
   "at": "Transnica & King Quality",
-  "dx": 7,
-  "dy": 29
+  "dx": 22,
+  "dy": 90
  },
  "trabajo-01": {
   "at": "Estadio Roque Tadeo Zavala",
-  "dx": -17,
-  "dy": 22
+  "dx": -45,
+  "dy": 60
  },
  "trabajo-02": {
   "at": "Estadio Roque Tadeo Zavala",
-  "dx": 20,
-  "dy": 17,
+  "dx": 52,
+  "dy": 45,
   "vehicle": "moto"
  },
  "trabajo-03": {
   "at": "Estadio Roque Tadeo Zavala",
-  "dx": 25,
-  "dy": 22
+  "dx": 68,
+  "dy": 60
  },
  "trabajo-04": {
   "at": "Estadio Roque Tadeo Zavala",
-  "dx": 14,
-  "dy": 28
+  "dx": 38,
+  "dy": 75
  },
  "trabajo-05": {
   "at": "Estadio Roque Tadeo Zavala",
-  "dx": 34,
-  "dy": 11
+  "dx": 90,
+  "dy": 30
  },
  "trabajo-06": {
   "at": "Estadio Roque Tadeo Zavala",
-  "dx": -25,
-  "dy": 14
+  "dx": -68,
+  "dy": 38
  },
  "trabajo-07": {
   "at": "Estadio Roque Tadeo Zavala",
-  "dx": 8,
-  "dy": 34
+  "dx": 22,
+  "dy": 90
  },
  "trabajo-08": {
   "at": "Estadio Roque Tadeo Zavala",
-  "dx": 39,
-  "dy": 22
+  "dx": 105,
+  "dy": 60
  },
  "trabajo-09": {
   "at": "Estadio Roque Tadeo Zavala",
-  "dx": 22,
-  "dy": -14
+  "dx": 60,
+  "dy": -38
  },
  "trabajo-10": {
   "at": "Estadio Roque Tadeo Zavala",
-  "dx": 31,
-  "dy": 31
+  "dx": 82,
+  "dy": 82
  },
  "tramites-01": {
   "at": "Hospital Granada",
-  "dx": 21,
-  "dy": 16
+  "dx": 60,
+  "dy": 45
  },
  "tramites-02": {
   "at": "Hospital Granada",
-  "dx": -18,
-  "dy": 13
+  "dx": -52,
+  "dy": 38
  },
  "tramites-03": {
   "at": "Hospital Granada",
-  "dx": 29,
-  "dy": -10
+  "dx": 82,
+  "dy": -30
  },
  "tramites-04": {
   "at": "Hospital Granada",
-  "dx": 5,
-  "dy": 21
+  "dx": 15,
+  "dy": 60
  },
  "tramites-05": {
   "at": "Hospital Granada",
-  "dx": -26,
-  "dy": -13
+  "dx": -75,
+  "dy": -38
  },
  "tramites-06": {
   "at": "Hospital Granada",
-  "dx": 16,
-  "dy": -21
+  "dx": 45,
+  "dy": -60
  },
  "tramites-07": {
   "at": "Hospital Granada",
-  "dx": -10,
-  "dy": 29
+  "dx": -30,
+  "dy": 82
  },
  "tramites-08": {
   "at": "Hospital Granada",
-  "dx": 34,
-  "dy": 8
+  "dx": 98,
+  "dy": 22
  },
  "tramites-09": {
   "at": "Hospital Granada",
-  "dx": -31,
-  "dy": 5
+  "dx": -90,
+  "dy": 15
  },
  "tramites-10": {
   "at": "Hospital Granada",
-  "dx": 10,
-  "dy": -29
+  "dx": 30,
+  "dy": -82
  },
  "xalteva-01": {
   "at": "Plaza Xalteva",
-  "dx": -9,
-  "dy": 11
+  "dx": -37,
+  "dy": 44
  },
  "xalteva-02": {
   "at": "Iglesia de Xalteva",
   "dx": 0,
-  "dy": 11
+  "dy": 44
  },
  "xalteva-03": {
   "at": "Iglesia de Xalteva",
-  "dx": 11,
-  "dy": 14
+  "dx": 44,
+  "dy": 59
  },
  "xalteva-04": {
   "at": "Plaza Xalteva",
-  "dx": 16,
-  "dy": -9
+  "dx": 67,
+  "dy": -37
  },
  "xalteva-05": {
   "at": "Plaza Xalteva",
-  "dx": -20,
-  "dy": -5
+  "dx": -81,
+  "dy": -22
  },
  "xalteva-06": {
   "at": "Plaza Xalteva",
-  "dx": 13,
-  "dy": 18,
+  "dx": 52,
+  "dy": 74,
   "vehicle": "bici"
  },
  "xalteva-07": {
   "at": "Fortaleza La Polvora",
-  "dx": 20,
-  "dy": 14
+  "dx": 81,
+  "dy": 59
  },
  "xalteva-08": {
   "at": "Cementerio Municipal de Granada",
-  "dx": 4,
-  "dy": -13
+  "dx": 15,
+  "dy": -52
  },
  "xalteva-09": {
   "at": "Iglesia de Xalteva",
-  "dx": -14,
-  "dy": 7
+  "dx": -59,
+  "dy": 30
  },
  "xalteva-10": {
   "at": "Fortaleza La Polvora",
-  "dx": 9,
-  "dy": -7
+  "dx": 37,
+  "dy": -30
  }
 };
 

@@ -393,8 +393,71 @@ test('a district crowd stands where that district is', () => {
     const mid = (l, f) => l.reduce((a, p) => a + f(p), 0) / l.length;
     const gap = Math.hypot(mid(mis, (p) => p.x) - mid(cro, (p) => p.x),
                            mid(mis, (p) => p.y) - mid(cro, (p) => p.y)) * 5;
-    assert.ok(gap < 400, `${key}: its crowd is ${Math.round(gap)} m from its missions`);
+    // The crowd is thrown deliberately wider than the missions now, out into
+    // the streets between the districts, so this is looser than it was. It is
+    // still here to catch the original fault, which was 1.0-1.3 km — a whole
+    // district's hint-givers in a different part of the city.
+    assert.ok(gap < 700, `${key}: its crowd is ${Math.round(gap)} m from its missions`);
   }
+});
+
+test('everybody is standing on ground a person could stand on', () => {
+  // Not the same check as "nobody is inside a wall": this reads the tile TYPE,
+  // so it names what somebody is standing in rather than only that they are
+  // stuck. Throwing the crowd wider put a man 90 tiles out into Cocibolca,
+  // because placement's last resort was "give back the tile you asked for"
+  // whether or not it was land.
+  const WET = { 4: 'the lake', 6: 'a roof', 7: 'a wall', 23: 'a church roof', 3: 'a tree', 17: 'a palm' };
+  const bad = [];
+  for (const p of world.people) {
+    const t = world.at(p.x, p.y);
+    if (SOLID.has(t)) bad.push(`${p.id} (${p.name}) is standing in ${WET[t] || 'tile ' + t}`);
+  }
+  assert.deepEqual(bad, [], bad.join('; '));
+});
+
+test('most of the streets of Granada have somebody within reach', () => {
+  // Kevin: "all of the quest givers are still all clumped together. 90% of the
+  // map is useless." It measured that way — 33% of the city's streets were
+  // within 300 m of anybody at all. This pins the improvement so a future
+  // change to SPREAD or the crowd ring cannot quietly undo it.
+  const STREET = new Set([1, 9, 13, 18, 19]);
+  const { W, H, grid } = world;
+  const reach = new Uint8Array(W * H);
+  const sx = Math.floor(world.S.px / TS), sy = Math.floor(world.S.py / TS);
+  const st = [sy * W + sx]; reach[st[0]] = 1;
+  while (st.length) {
+    const i = st.pop(), x = i % W, y = (i / W) | 0;
+    for (const j of [x > 0 ? i-1 : -1, x < W-1 ? i+1 : -1, y > 0 ? i-W : -1, y < H-1 ? i+W : -1]) {
+      if (j < 0 || reach[j] || SOLID.has(grid[j])) continue;
+      reach[j] = 1; st.push(j);
+    }
+  }
+  const d = new Int32Array(W * H).fill(-1);
+  let q = [];
+  for (const p of world.people) {
+    const i = p.y * W + p.x;
+    if (reach[i] && d[i] < 0) { d[i] = 0; q.push(i); }
+  }
+  while (q.length) {
+    const next = [];
+    for (const i of q) {
+      const x = i % W, y = (i / W) | 0;
+      for (const j of [x > 0 ? i-1 : -1, x < W-1 ? i+1 : -1, y > 0 ? i-W : -1, y < H-1 ? i+W : -1]) {
+        if (j < 0 || d[j] >= 0 || !reach[j]) continue;
+        d[j] = d[i] + 1; next.push(j);
+      }
+    }
+    q = next;
+  }
+  let street = 0, near = 0;
+  for (let i = 0; i < W * H; i++) {
+    if (!reach[i] || !STREET.has(grid[i])) continue;
+    street++;
+    if (d[i] >= 0 && d[i] * 5 <= 300) near++;
+  }
+  const pct = Math.round(100 * near / street);
+  assert.ok(pct >= 55, `only ${pct}% of the city's streets have somebody within 300 m`);
 });
 
 test('a district is a few blocks, not one tile and not half the city', () => {

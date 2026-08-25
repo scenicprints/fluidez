@@ -352,9 +352,47 @@ otherwise.
 
 **A district was one screenful.** Nine of the twelve hung every mission off a
 single named place with offsets inside about seventy metres. `SPREAD` in
-`game_bake.py` widens them per district — a district is now 150–370 m across,
-a few blocks you walk through. The crowd ring in `world.js` was widened to
-match, or you get all the hints in one knot and then walk the rest alone.
+`game_bake.py` widens them per district. The crowd ring in `world.js` was
+widened to match, or you get all the hints in one knot and then walk the rest
+alone.
+
+**And then it still was not enough.** Kevin, after playing it: *"all of the
+quest givers are still all clumped together. 90% of the map is useless."* He
+was right, and the honest measurement is against STREETS rather than against
+the map — half the map is the lake, fields and yards, and a field with nobody
+in it is a field, not a bug. Of Granada's 3.2 km² of actual street:
+
+| | within 300 m of a quest giver | within 300 m of anybody |
+|---|---|---|
+| before | 30% | 33% |
+| now | **46%** | **63%** |
+
+Three things got it there, and the third is the one that mattered:
+
+1. **`SPREAD` again**, to about ×7. It was swept and measured rather than
+   guessed — the numbers are in `game_bake.py`. Coverage keeps improving past
+   that and the districts stop being places: at ×12 the radius the arrow
+   switches off inside is most of the city.
+2. **Placement prefers PAVING.** `standing()` looks up to 34 tiles for a street
+   before it will settle for a yard. Somebody you can only find by walking into
+   the back of a block is somebody you will not find.
+3. **The street crowd is thrown far wider than the missions.** This is the
+   asymmetry to keep: a market mission has to be at the market, but the people
+   you stop and ask do not — somebody on a corner six blocks out can tell you
+   where the market is perfectly well. So the crowd fills the streets BETWEEN
+   the districts, which is where the city was empty. That is most of the jump
+   from 33% to 63%.
+
+**The district radius is capped at 450 m** however far the district sprawls,
+because the radius is where the arrow decides you have arrived. Past it you are
+in the right part of town and you ask — and now there is somebody to ask.
+
+**Do not spread a district radially when it lies along something.** El Malecón
+runs down the lakeshore and Afuera along one road out of town. Malecón's offsets
+leaned east, which was harmless at the original scale and became nonsense at ×7:
++14 tiles became +63, well out into Cocibolca, and every one of them slid back
+onto the same strip of beach — reinventing the clumping. They spread along the
+shore now, and those two districts have a smaller factor.
 
 **The radius is the third quartile, not the maximum.** One straggler used to set
 it for everybody: the man who looks after the cemetery is a kilometre west of

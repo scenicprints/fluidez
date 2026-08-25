@@ -202,19 +202,56 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
            !solidAt(px - 4, py - 12) && !solidAt(px + 4, py - 12);
   }
 
+  // Paving. Somebody with something to say is standing in the street, not in
+  // the middle of a field or round the back of a block — and a person you can
+  // only find by walking into somebody's yard is a person you will not find.
+  const PAVED = new Set([COBBLE, PLAZA, KERB, ASPHALT, DIRT, SAND]);
+
   const taken = new Set([START.x + ',' + START.y]);
-  function standing(tx, ty) {
+  /**
+   * A tile to stand on, as near to (tx,ty) as can be managed.
+   *
+   * @param fx,fy  where to try instead if that whole area is unusable. The
+   *   last line used to be `return {x: tx, y: ty}` — the requested tile,
+   *   walkable or not. Throwing the crowd wider found that immediately:
+   *   Malecón's anchor is on the lakeshore, an offset put somebody 90 tiles
+   *   out into Cocibolca, no land was found within the search, and the
+   *   fallback stood him in the water where he could be seen and never
+   *   reached. There is no position this can be asked for that has no answer,
+   *   because the spawn is always an answer.
+   */
+  function standing(tx, ty, fx, fy) {
+    const free = (x, y) =>
+      x >= 1 && y >= 1 && x < W - 1 && y < H - 1 &&
+      REACH[y * W + x] && !taken.has(x + ',' + y) &&
+      bodyFits(x * TS + 8, y * TS + 8);
+    const claim = (x, y) => { taken.add(x + ',' + y); return { x, y }; };
+    // A street first, and only then anywhere at all — searched in two passes
+    // rather than one so a pavement thirty tiles away still beats the yard
+    // immediately behind them.
+    for (let r = 0; r < 34; r++) {
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = tx + dx, y = ty + dy;
+        if (free(x, y) && PAVED.has(at(x, y))) return claim(x, y);
+      }
+    }
     for (let r = 0; r < 70; r++) {
       for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
         const x = tx + dx, y = ty + dy;
-        if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1) continue;
-        if (!REACH[y * W + x] || taken.has(x + ',' + y)) continue;
-        taken.add(x + ',' + y);
-        return { x, y };
+        if (free(x, y)) return claim(x, y);
+        // Last resort: somewhere reachable, even if their shoulders clip a wall.
+        if (x >= 1 && y >= 1 && x < W - 1 && y < H - 1 &&
+            REACH[y * W + x] && !taken.has(x + ',' + y)) return claim(x, y);
       }
     }
-    return { x: tx, y: ty };
+    // Nothing within seventy tiles: that request was into the lake or off the
+    // edge of the world. Fall back to where the district is, and then to the
+    // one tile we know for certain is good.
+    if (Number.isFinite(fx) && (fx !== tx || fy !== ty)) return standing(fx, fy);
+    if (tx !== START.x || ty !== START.y) return standing(START.x, START.y);
+    return { x: START.x, y: START.y };
   }
 
   // Skin and shirt drawn from the id, so a face never changes between sessions.
@@ -233,7 +270,7 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
   for (const m of missions) {
     const p = PLACE[m.id] || { at: DISTRICT[m.district], dx: 0, dy: 0 };
     const anchor = spot(p.at) || spot(DISTRICT[m.district] || '') || pc;
-    const w = standing(anchor.x + (p.dx || 0), anchor.y + (p.dy || 0));
+    const w = standing(anchor.x + (p.dx || 0), anchor.y + (p.dy || 0), anchor.x, anchor.y);
     people.push({
       id: m.id, crowd: false, district: m.district, mission: m,
       name: m.who, goal: m.goal, culture: m.culture, beats: m.beats,
@@ -245,17 +282,24 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
   }
   // The crowd. There are no map markers and Granada has no usable street
   // names, so these ARE the quest system.
-  // Spread as wide as the missions are. A district's people are placed a few
-  // hundred metres across now, so a crowd huddled inside seventy metres of the
-  // anchor would be a knot of hint-givers in the middle of an area with nobody
-  // in the rest of it — you would get every direction in one spot and then walk
-  // the district alone.
-  const ring = [[13,9],[-15,11],[11,-13],[-13,-11],[21,0],[0,19],[-23,2],[4,-23],
-                [25,15],[-25,-15],[17,-19],[-19,17]];
+  // The crowd is what fills the city in.
+  //
+  // The missions belong where they were written — a market mission is at the
+  // market — so they can only spread so far before they stop making sense. The
+  // street crowd has no such tie: they are the people you stop and ask, and
+  // somebody standing on a corner six blocks out can tell you where the market
+  // is perfectly well. So they are thrown much wider than the missions, out
+  // into the streets BETWEEN the districts, which is where Granada was empty.
+  //
+  // They still belong to a district, and still start from its anchor, so what
+  // you are told in one part of town is still about that part of town.
+  const ring = [[70,40],[-78,52],[54,-66],[-62,-56],[104,8],[10,96],[-112,14],[18,-108],
+                [128,74],[-124,-78],[86,-96],[-92,88]];
   crowd.forEach((h, j) => {
     const anchor = spot(DISTRICT[h.district] || '') || pc;
     const [ox, oy] = ring[j % ring.length];
-    const w = standing(anchor.x + ox + (j % 5) * 6 - 12, anchor.y + oy + (j % 3) * 8 - 8);
+    const w = standing(anchor.x + ox + (j % 7) * 22 - 66, anchor.y + oy + (j % 5) * 26 - 52,
+                       anchor.x, anchor.y);
     people.push({
       id: h.id || ('crowd-' + j), crowd: true, district: h.district,
       name: h.kind, says: h.says, en: h.en, points_at: h.points_at || [],
@@ -288,7 +332,13 @@ export function createWorld({ missions = [], crowd = [], finished = {} } = {}) {
     // then found the way everything else is, by asking somebody.
     const away = d.list.map((p) => Math.hypot(p.x - d.x, p.y - d.y)).sort((a, b) => a - b);
     const q3 = away[Math.min(away.length - 1, Math.floor(away.length * 0.75))];
-    d.r = Math.max(28, Math.min(q3 + 14, 120));
+    // Capped at 450 m however far the district actually sprawls. The radius is
+    // the distance at which the arrow decides you have arrived and switches
+    // off, so letting it follow a district that is now most of a kilometre
+    // across would put it out while you were still nowhere. Past the cap you
+    // are in the right part of town and you ask — and there are people on the
+    // streets between the districts now to ask.
+    d.r = Math.max(28, Math.min(q3 + 14, 90));
   }
 
   // ── state ───────────────────────────────────────────────

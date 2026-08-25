@@ -143,11 +143,18 @@ for (const n of P.NPCS) {
   // placement put everybody near the place they were assigned to: if the
   // slide onto reachable ground moved somebody a long way, they are no longer
   // where the mission says they are.
+  //
+  // The bound is 36 tiles rather than 16 because the APP now looks up to 34
+  // tiles away for a paved spot before it will settle for a yard, and the
+  // placements baked into this file are the app's. This file still runs the
+  // mockup's own older copy of the engine, which has no such preference — so a
+  // slide here is the mockup being behind, not the placement being wrong. The
+  // app wins when they disagree; see GAME.md.
   const home = n.at && P.spot(n.at);
   if (home) {
     const want = { x: home.x + (n.dx || 0), y: home.y + (n.dy || 0) };
     const slid = Math.hypot(n.x - want.x, n.y - want.y);
-    check(slid < 16, `${n.id} ended up near where it was placed`,
+    check(slid < 36, `${n.id} ended up near where it was placed`,
           `slid ${slid.toFixed(0)} tiles (${(slid * 5) | 0} m) off ${n.at}`);
   }
 }

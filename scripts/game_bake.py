@@ -64,10 +64,36 @@ DISTRICT = {
 # water and Afuera along one road out of town, so pushing those out hard just
 # presses people against the shore or the verge; El Centro, Las fiestas and
 # Pantanal were already spread over real separate landmarks and need less.
+# Second pass, after Kevin played it: "all of the quest givers are still all
+# clumped together. 90% of the map is useless." He was right and it measured
+# badly -- only 30% of Granada's streets were within 300 m of anybody, and 81%
+# of the properly built-up blocks had nobody in them at all. Twelve districts
+# at a 250 m radius cover about a third of the built-up city; the rest was the
+# 90%. These put each district at roughly 400-550 m, which is a quarter of an
+# hour's walk across rather than one screen, and between them they now reach
+# most of the streets that exist.
+#
+# Measured, not guessed. Sweeping the multiplier and re-measuring how much of
+# Granada's STREET is within 300 m of somebody:
+#
+#     spread   quest givers   anybody     district radius
+#      x3.4        39%          60%         211-430 m
+#      x7          50%          65%         370-780 m
+#      x12         60%          72%         570-850 m
+#
+# It keeps improving, and the districts keep getting less real: past about x7
+# the radius the arrow switches off inside is most of the city, which makes the
+# arrow useless. x7 is where the two curves cross. The rest of the coverage
+# comes from the street crowd, which can be thrown far wider because a person
+# on a corner can tell you where the market is without being at the market.
+# Roughly even, and lower at the edges of town. Malecon runs along the water
+# and Afuera along one road out, so a radial spread there throws half its
+# offsets into Cocibolca or the fields and every one of them slides back to the
+# same strip of shore — which is the clumping it was meant to cure.
 SPREAD = {
-    'centro': 1.7, 'mercado': 2.6, 'xalteva': 1.8, 'guadalupe': 2.8,
-    'terminal': 2.4, 'trabajo': 2.8, 'tramites': 2.6, 'fiestas': 1.8,
-    'barrio': 2.6, 'pantanal': 1.6, 'malecon': 1.7, 'afuera': 1.8,
+    'centro': 7.0, 'mercado': 7.5, 'xalteva': 7.4, 'guadalupe': 7.5,
+    'terminal': 7.5, 'trabajo': 7.5, 'tramites': 7.5, 'fiestas': 5.5,
+    'barrio': 7.5, 'pantanal': 5.5, 'malecon': 4.5, 'afuera': 5.0,
 }
 
 
@@ -213,13 +239,20 @@ PLACE = {
     'tramites-09': (u'Hospital Granada', -12, 2, None),
     'tramites-10': (u'Hospital Granada', 4, -11, None),
     # El Malecón: the lakefront itself, so these hug the shore.
+    #
+    # The shore runs north to south with Cocibolca to the EAST, so these spread
+    # along Y and lean inland on X. They used to lean east, which was harmless
+    # at the original scale and became nonsense once the district was spread:
+    # +14 became +63 tiles, which is a long way out into the lake, and every
+    # one of them slid back to the same strip of beach — the clumping this was
+    # supposed to cure. The two lanchas may sit at the water, because they float.
     'malecon-01': (u'Centro Turistico', -5, 6, None),
-    'malecon-02': (u'Centro Turistico', 8, 9, 'lancha'),
+    'malecon-02': (u'Centro Turistico', 6, 9, 'lancha'),
     'malecon-03': (u'Centro Turistico', -8, -4, None),
-    'malecon-04': (u'Centro Turistico', 3, 12, None),
-    'malecon-05': (u'Centro Turistico', 11, -5, None),
+    'malecon-04': (u'Centro Turistico', -3, 12, None),
+    'malecon-05': (u'Centro Turistico', -6, -12, None),
     'malecon-06': (u'Centro Turistico', -11, 9, None),
-    'malecon-07': (u'Centro Turistico', 14, 4, None),
+    'malecon-07': (u'Centro Turistico', -9, 16, None),
     'malecon-08': (u'Centro Turistico', -3, -9, 'lancha'),
     # Las fiestas: around the two churches of El Socorro, north of the centre.
     'fiestas-01': (u'Parroquia Nuestra Se\xf1ora del Socorro', -6, 5, None),
