@@ -33,6 +33,8 @@
      untouched by this split. */
   --accent: #E8A33D; --accent-d: #8A5F1E; --accent-ink: #241A0A;
   --chrome-grad: linear-gradient(96deg, var(--oro), #D98F2E);
+  --node-grad: linear-gradient(150deg, var(--oro), #C77F26);
+  --pill-ink: var(--basalt);
   --perch-glow: radial-gradient(70% 74% at 50% 96%, rgba(232,163,61,.14), transparent 70%);
 
   --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
@@ -54,6 +56,8 @@
   --txt: #F0F1F3; --txt2: #A6AAB2; --txt3: #6F737C;
   --accent: #E0392E; --accent-d: #7E211B; --accent-ink: #FFFFFF;
   --chrome-grad: linear-gradient(135deg, #FFFFFF, #F2A49D 16%, #E8463B 46%, #AB1D14);
+  --node-grad: linear-gradient(150deg, #F2A49D, #D8342A);
+  --pill-ink: #FFFFFF;
   --perch-glow: radial-gradient(72% 76% at 50% 96%, rgba(255,255,255,.07), rgba(224,57,46,.13) 42%, transparent 72%);
 }
 
@@ -435,7 +439,7 @@ button { font-family: inherit; color: inherit; }
 /* ── path ──────────────────────────────────────────────── */
 .trail { padding: 6px 18px 26px; }
 .phase-h { margin: 22px 0 6px; display: flex; align-items: baseline; gap: 9px; }
-.phase-n { font-family: var(--serif); font-size: 12px; color: var(--accent-ink); background: var(--accent); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; flex: none; }
+.phase-n { font-family: var(--serif); font-size: 12px; color: var(--pill-ink); background: var(--accent); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; flex: none; }
 .phase-h.locked .phase-n { background: var(--ceniza3); color: var(--txt3); }
 .phase-t { font-size: 14.5px; font-weight: 700; }
 .phase-h.locked .phase-t { color: var(--txt3); }
@@ -448,7 +452,7 @@ button { font-family: inherit; color: inherit; }
 .node:active .dot { transform: scale(.92); }
 .node.done .dot { background: var(--jade-d); border-color: var(--jade); color: var(--papel); }
 .node.now .dot {
-  background: var(--chrome-grad); border-color: var(--accent); color: var(--accent-ink);
+  background: var(--node-grad); border-color: var(--accent); color: var(--pill-ink);
   box-shadow: 0 0 0 5px rgba(232,163,61,.15), 0 0 26px -4px rgba(232,163,61,.7);
   animation: beat 2.4s ease-in-out infinite;
 }
