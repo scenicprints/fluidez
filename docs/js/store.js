@@ -7,20 +7,76 @@
 
 const NS = 'fl';
 let userId = null;
+let course = null;
 let onChange = () => {};
 
-export function setUser(id) { userId = id; adoptStamp(); }
+export function setUser(id) {
+  userId = id;
+  // The course has to be known before anything is read, and settings is where
+  // it lives — so derive it here rather than waiting for the pack to load.
+  course = settings.get('language') || null;
+  migrateToPerCourse();
+  adoptStamp();
+}
 export function currentUser() { return userId; }
 export function onStoreChange(fn) { onChange = fn; }
 
+/**
+ * Which course the reader is on. Everything about a course is stored under it.
+ *
+ * Progress used to be keyed on the user alone, so it was SHARED between
+ * courses — and because both courses number their stories p0-01..p7-18, it did
+ * not merely leak, it ALIASED: fifteen Spanish stories read made the German
+ * Path show fifteen read, and the vocabulary of both languages piled into one
+ * map. Called by applyPack(), so it follows the pack rather than being set by
+ * hand anywhere.
+ */
+export function setCourse(code) {
+  if (!code || code === course) return;
+  course = code;
+  onChange('course', code);
+}
+export function currentCourse() { return course; }
+
 const key = (name) => `${NS}:${userId || '_'}:${name}`;
-const globalKey = (name) => `${NS}:${name}`;
+// A course's own key. Falls back to the flat one when no course is known yet,
+// so a read before the pack loads still finds something rather than nothing.
+const scoped = (name) => (course ? `${NS}:${userId || '_'}:${course}:${name}` : key(name));
+
+// What belongs to a COURSE rather than to the person. Everything else —
+// settings, the daily streak, the goal, the game — is about the reader and
+// stays whole across a switch: doing a German lesson today has to keep
+// yesterday's streak alive.
+const PER_COURSE = new Set(['vocab', 'progress', 'patterns']);
+const keyFor = (name) => (PER_COURSE.has(name) ? scoped(name) : key(name));
 
 function read(name, fallback) {
   try {
-    const raw = localStorage.getItem(key(name));
+    const raw = localStorage.getItem(keyFor(name));
     return raw === null ? fallback : JSON.parse(raw);
   } catch { return fallback; }
+}
+
+/**
+ * Move a pre-split device's progress under the course it was really for.
+ *
+ * Everything before this was flat, and it was all Spanish: de-ch shipped with
+ * zero lessons until the day this landed, so there was no German progress that
+ * could be worth keeping. Anything found is filed under es-ni. Runs once —
+ * afterwards the flat keys are gone and there is nothing left to move.
+ */
+function migrateToPerCourse() {
+  if (!userId) return;
+  try {
+    for (const name of PER_COURSE) {
+      const flat = key(name);
+      const raw = localStorage.getItem(flat);
+      if (raw === null) continue;
+      const target = `${NS}:${userId}:es-ni:${name}`;
+      if (localStorage.getItem(target) === null) localStorage.setItem(target, raw);
+      localStorage.removeItem(flat);
+    }
+  } catch {}
 }
 
 // Which fields make up the snapshot the cloud mirrors. Writing one of them
@@ -62,7 +118,7 @@ function adoptStamp() {
 }
 
 function write(name, value) {
-  try { localStorage.setItem(key(name), JSON.stringify(value)); } catch {}
+  try { localStorage.setItem(keyFor(name), JSON.stringify(value)); } catch {}
   if (SYNCED.has(name)) stamp();
   onChange(name, value);
 }
@@ -300,11 +356,50 @@ export const game = {
 };
 
 // ── the whole picture, for syncing ──────────────────────────
-export function snapshot() {
+function courseCodes() {
+  // Every course this device has anything for, read off the keys themselves so
+  // a new one needs no list kept in step.
+  const out = new Set(course ? [course] : []);
+  try {
+    const prefix = `${NS}:${userId || '_'}:`;
+    for (const k of Object.keys(localStorage)) {
+      if (!k.startsWith(prefix)) continue;
+      const rest = k.slice(prefix.length).split(':');
+      if (rest.length === 2 && PER_COURSE.has(rest[1])) out.add(rest[0]);
+    }
+  } catch {}
+  return [...out];
+}
+
+function courseBlob(code) {
+  const at = (name) => {
+    try {
+      const raw = localStorage.getItem(`${NS}:${userId || '_'}:${code}:${name}`);
+      return raw === null ? null : JSON.parse(raw);
+    } catch { return null; }
+  };
   return {
-    vocab: vocab.all(),
-    progress: progress.all(),
-    patterns: patterns.unlocked(),
+    vocab: at('vocab') || {},
+    progress: at('progress') || {},
+    patterns: at('patterns') || [],
+  };
+}
+
+export function snapshot() {
+  const courses = {};
+  for (const code of courseCodes()) courses[code] = courseBlob(code);
+  return {
+    // Per course, and ALL of them — a phone that syncs only the course it
+    // happens to have open would push the other one's progress away.
+    courses,
+    // vocab, progress and patterns are DELIBERATELY not at the top level any
+    // more. Leaving them there for backwards compatibility would have meant
+    // publishing whichever course happened to be open under the old flat
+    // names — so a device still on the previous build would pull German
+    // progress and restore it as Spanish. Omitting them makes that same
+    // device skip progress entirely and keep its own, which is the safe
+    // failure. It picks the new shape up as soon as it updates, and the app
+    // updates itself from Pages.
     settings: settings.all(),
     streak: daily.streak(),
     longest: daily.longest(),
@@ -318,9 +413,34 @@ export function snapshot() {
 // Used when signing in on a new device: whatever the cloud has, take it.
 export function restore(snap) {
   if (!snap) return;
-  if (snap.vocab) write('vocab', snap.vocab);
-  if (snap.progress) write('progress', snap.progress);
-  if (snap.patterns) write('patterns', snap.patterns);
+  if (snap.courses && typeof snap.courses === 'object') {
+    // The current shape: every course restored under its own keys.
+    for (const [code, blob] of Object.entries(snap.courses)) {
+      if (!blob) continue;
+      const put = (name, value) => {
+        if (value === undefined || value === null) return;
+        try {
+          localStorage.setItem(`${NS}:${userId || '_'}:${code}:${name}`, JSON.stringify(value));
+        } catch {}
+      };
+      put('vocab', blob.vocab);
+      put('progress', blob.progress);
+      put('patterns', blob.patterns);
+    }
+  } else {
+    // A document written before progress was split. It is all Spanish — de-ch
+    // had no lessons until the split shipped — so it lands under es-ni rather
+    // than over whichever course this device happens to have open.
+    const legacy = (name, value) => {
+      if (!value) return;
+      try {
+        localStorage.setItem(`${NS}:${userId || '_'}:es-ni:${name}`, JSON.stringify(value));
+      } catch {}
+    };
+    legacy('vocab', snap.vocab);
+    legacy('progress', snap.progress);
+    legacy('patterns', snap.patterns);
+  }
   if (snap.settings) write('settings', snap.settings);
   if (typeof snap.streak === 'number') write('streak', snap.streak);
   if (typeof snap.longest === 'number') write('longest', snap.longest);

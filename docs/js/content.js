@@ -10,6 +10,7 @@
 
 import { setPhases, bareWord } from './engine.js';
 import { setStrings } from './ui.js';
+import { setCourse } from './store.js';
 
 const REGISTRY = {
   user: 'scenicprints',
@@ -198,6 +199,9 @@ export function loadCachedPack(code) {
 
 function applyPack(pack) {
   content.language = pack.language;
+  // Progress is stored per course, so the store has to be told which one this
+  // is before any screen reads from it.
+  if (pack.language && pack.language.code) setCourse(pack.language.code);
   content.manifest = pack.manifest;
   content.dict = pack.dict || {};
   content.forms = pack.forms || {};

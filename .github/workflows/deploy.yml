@@ -42,6 +42,12 @@ jobs:
       - name: Test the mascots
         run: node docs/js/creatures.test.mjs
 
+      # Progress is stored per course. Sharing it between two courses that
+      # number their stories the same way does not leak, it ALIASES: fifteen
+      # Spanish stories read made the German Path show fifteen read.
+      - name: Test that progress stays with its course
+        run: node docs/js/store.test.mjs
+
       # A pack field that is added everywhere except applyPack() arrives,
       # gets cached, and never reaches the app. That shipped once.
       - name: Test that a downloaded course reaches the app
