@@ -790,6 +790,43 @@ test('the map does not survive leaving the screen either', () => {
   assert.ok(!document.getElementById('gameMap').classList.contains('on'));
 });
 
+test('the A button works under a thumb, not just under a mouse', () => {
+  // THE bug that made Granada unplayable on a phone, and the reason it went
+  // unnoticed: A was bound to `click`, and the same button cancels touchstart
+  // to stop Android long-pressing it into a selection. Cancelling touchstart
+  // tells the browser not to send the compatibility mouse events for that
+  // touch, and `click` is one of them — so a finger produced NOTHING, while a
+  // mouse, and every test that called .click(), worked perfectly.
+  //
+  // A real tap is reproduced here: touchstart (which the code cancels),
+  // then pointerup, and NO click at all.
+  store.setUser('thumb');
+  standOn(withBeats.id);
+  screen.start({ missions, crowd });
+  const a = document.getElementById('gameA');
+
+  const prevented = a.fire('touchstart', { pointerId: 1 });
+  assert.ok(prevented, 'the A button no longer cancels touchstart — check the buzzing is still fixed');
+  a.fire('pointerup', { pointerId: 1, button: 0 });
+
+  assert.ok(document.getElementById('gameTalk').classList.contains('on'),
+    'a tap on A did nothing: it is still waiting for a click the browser will never send');
+});
+
+test('a mouse still only talks once per click', () => {
+  // A mouse sends pointerup AND click. Binding both naively would open the
+  // conversation and immediately treat the second one as another press.
+  store.setUser('mouse');
+  standOn(withBeats.id);
+  screen.start({ missions, crowd });
+  const a = document.getElementById('gameA');
+  a.fire('pointerup', { pointerId: 1, button: 0 });
+  a.fire('click');
+  assert.ok(document.getElementById('gameTalk').classList.contains('on'));
+  assert.equal(document.getElementById('gamePanel').innerHTML.match(/id="gameAway"/g).length, 1,
+    'the panel was rendered more than once for a single click');
+});
+
 test('a missing control does not take the whole game down with it', () => {
   // Every one of these is bound in wireControls, which used to do
   // `$(id).addEventListener` with no guard and set `wired` before it started —

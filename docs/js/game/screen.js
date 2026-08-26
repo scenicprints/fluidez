@@ -920,6 +920,20 @@ function wireControls() {
   // keyboard, and nothing to talk to. That is far too much to lose over a
   // control that is merely missing, and it is invisible to game.test.mjs,
   // whose stub DOM conjures any element you ask it for.
+  /** Fires once per tap, whether the browser gives us pointerup, click or both. */
+  const tapOn = (id, fn) => {
+    const el = document.getElementById(id);
+    if (!el) { console.warn(`Granada: no #${id} to bind a tap to`); return; }
+    let justTapped = false;
+    el.addEventListener('pointerup', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      justTapped = true;
+      setTimeout(() => { justTapped = false; }, 700);
+      fn();
+    });
+    el.addEventListener('click', () => { if (!justTapped) fn(); });
+  };
+
   const on = (id, ev, fn, opts) => {
     const el = document.getElementById(id);
     if (!el) { console.warn(`Granada: no #${id} to bind ${ev} to`); return; }
@@ -928,7 +942,21 @@ function wireControls() {
 
   // Walking and talking first, so they are never the casualty of anything
   // added below them.
-  on('gameA', 'click', tryTalk);
+  // The A button is bound to the TAP, not to `click`.
+  //
+  // This is the bug that made Granada unplayable on a phone. Down at the bottom
+  // of this function the A button cancels `touchstart`, to stop Android
+  // long-pressing it into a selection and buzzing. Cancelling touchstart also
+  // tells the browser not to dispatch the compatibility mouse events for that
+  // touch -- and `click` is one of them. So on a touchscreen the A button fired
+  // nothing at all, while working perfectly under a mouse and when a test
+  // called .click() on it. Kevin: "The A button is not working. I cant talk to
+  // anyone." He had simply been the first person to get near enough to press it.
+  //
+  // Pointer events are not compatibility events and are not suppressed, so
+  // `pointerup` is what a finger actually produces here. `click` stays for the
+  // keyboard, guarded so a mouse -- which fires both -- only counts once.
+  tapOn('gameA', tryTalk);
   on('gameHud', 'click', openLog);
   on('gameLogClose', 'click', closeLog);
   on('gameMapBtn', 'click', openMap);
