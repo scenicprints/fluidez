@@ -544,6 +544,9 @@ button { font-family: inherit; color: inherit; }
 .w.s3 { box-shadow: inset 0 -3px 0 rgba(52,179,150,.55); }
 .w.s2 { box-shadow: inset 0 -3px 0 rgba(232,163,61,.55); }
 .w.s1 { box-shadow: inset 0 -3px 0 rgba(217,97,63,.45); }
+/* The two halves of a separable verb. Marked so the stranded prefix reads as
+   part of the verb at the front of the clause rather than a stray word. */
+.w.wsep { border-bottom: 1px dotted var(--txt3); }
 .spk { background: none; border: 0; cursor: pointer; color: var(--tinta2); font-size: 14px; padding: 0 0 0 6px; vertical-align: middle; }
 
 /* ── word sheet ────────────────────────────────────────── */

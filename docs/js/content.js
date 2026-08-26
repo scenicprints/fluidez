@@ -8,7 +8,7 @@
 // The entire pack is downloaded once and kept in local storage, so the app
 // works with no signal at all. That is the point: this gets used in Nicaragua.
 
-import { setPhases } from './engine.js';
+import { setPhases, bareWord } from './engine.js';
 import { setStrings } from './ui.js';
 
 const REGISTRY = {
@@ -443,11 +443,24 @@ export function lookup(word) {
  * nothing for the other. Resolving through the forms map makes a word one
  * word, however it is spelt on the day.
  */
-export function resolve(word) {
-  if (!word) return null;
-  if (content.dict[word]) return word;
-  const lemma = content.forms[word];
-  return lemma && content.dict[lemma] ? lemma : null;
+/**
+ * The dictionary key a written word belongs to, or null.
+ *
+ * Takes the word AS WRITTEN. It used to be handed a lower-cased one, which is
+ * right for Spanish and wrong for German, where every noun is capitalised —
+ * see dictKey() in engine.js for the whole account. Passing the raw token lets
+ * the exact spelling be tried before the lower-cased one.
+ */
+export function resolve(raw) {
+  if (!raw) return null;
+  const bare = bareWord(raw);
+  const low = bare.toLowerCase();
+  for (const k of (bare === low ? [low] : [bare, low])) {
+    if (content.dict[k]) return k;
+    const lemma = content.forms[k];
+    if (lemma && content.dict[lemma]) return lemma;
+  }
+  return null;
 }
 
 export function cacheSize() {

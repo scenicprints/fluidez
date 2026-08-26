@@ -9,6 +9,7 @@ import {
   memoryStrength, evidence, dueAt, dueWords, dueCount, band, tokenize, cleanWord, conjugate, calcFluency,
   fadingWords, leeches, gradeTyped, normalizeAnswer, orderCandidates,
   scramble, generateExercises, phaseName, phaseDesc, setPhases,
+  verbPartItems, PART_MODES, dictKey, bareWord, separableBindings,
 } from './engine.js';
 
 let passed = 0;
@@ -388,9 +389,11 @@ test('a gap blank replaces the whole token, never a substring of another word', 
   }
 });
 
-test('an empty library still produces a fallback rather than crashing', () => {
-  const ex = generateExercises({}, {}, [], 5);
-  assert.equal(ex.length, 1);
+test('an empty library produces nothing, not a sentence in another language', () => {
+  // It used to return one hardcoded Spanish item so the drill was never empty.
+  // In a German course that is the app teaching the wrong language, so it
+  // returns nothing now and startReview() says so.
+  assert.deepEqual(generateExercises({}, {}, [], 5), []);
 });
 
 test('a language can restrict which exercise kinds it uses', () => {
@@ -420,6 +423,229 @@ test('all eight phases are named', () => {
   assert.equal(phaseName(0), 'Survival');
   setPhases(null);
   assert.equal(phaseName(7), 'Native-Like');
+});
+
+// ── looking a written word up ───────────────────────────────
+// German capitalises every noun. Lower-casing before the lookup lost all of
+// them, and answered the two pairs where the capital IS the word backwards.
+const DE = {
+  Mann: { en: 'man', pos: 'n', g: 'der' },
+  Morgen: { en: 'morning', pos: 'n', g: 'der' },
+  morgen: { en: 'tomorrow', pos: 'adv' },
+  Weg: { en: 'way', pos: 'n', g: 'der' },
+  weg: { en: 'gone', pos: 'adv' },
+  ich: { en: 'I', pos: 'pron' },
+  der: { en: 'the', pos: 'art' },
+  sagen: { en: 'to say', pos: 'v' },
+};
+const ES = { llego: { en: 'I arrive', pos: 'v' }, calor: { en: 'heat', pos: 'n' } };
+
+test('a capitalised noun finds its own entry', () => {
+  assert.equal(dictKey(DE, 'Mann'), 'Mann');
+  assert.equal(dictKey(DE, 'Mann,'), 'Mann');
+});
+
+test('the capital is the difference, and it decides', () => {
+  assert.equal(dictKey(DE, 'Morgen'), 'Morgen');   // der Morgen, the morning
+  assert.equal(dictKey(DE, 'morgen'), 'morgen');   // morgen, tomorrow
+  assert.equal(dictKey(DE, 'Weg'), 'Weg');
+  assert.equal(dictKey(DE, 'weg'), 'weg');
+});
+
+test('a word capitalised only because it starts a sentence still lands', () => {
+  assert.equal(dictKey(DE, 'Ich'), 'ich');
+});
+
+test('a lower-case dictionary behaves exactly as it always did', () => {
+  // Spanish keys are lower case, so the exact-spelling try always misses and
+  // every lookup falls through to where it used to land.
+  assert.equal(dictKey(ES, 'Llego'), 'llego');
+  assert.equal(dictKey(ES, 'llego'), 'llego');
+  assert.equal(dictKey(ES, '¡Calor!'), 'calor');
+  assert.equal(dictKey(ES, 'nada'), null);
+});
+
+test('bareWord keeps capitals and drops punctuation', () => {
+  assert.equal(bareWord('Grüezi,'), 'Grüezi');
+  assert.equal(bareWord('¿Qué'), 'Qué');
+  assert.equal(bareWord(null), '');
+});
+
+test('gap items can blank a German noun', () => {
+  // The old lower-cased filter found no noun in a German sentence at all, so
+  // every gap would have been built out of the function words.
+  const lessons = [{ id: 'p0-01', sentences: [{ es: 'Der Mann geht weg.', en: 'The man walks off.' }] }];
+  // 200, not 8: the target is picked at random from the candidates, so a small
+  // sample misses the noun by luck often enough to make the test flap.
+  const items = generateExercises({}, DE, lessons, 200, ['gap']);
+  assert.ok(items.length);
+  for (const it of items) {
+    assert.ok(DE[it.correct], `${it.correct} is not a dictionary key`);
+    assert.ok(it.sentence.includes('______'));
+  }
+  assert.ok(items.some((i) => i.correct === 'Mann'), 'the noun was never the target');
+  // "Der" at the front of the sentence resolves down to the article, not to
+  // some capitalised key that does not exist.
+  assert.ok(!items.some((i) => i.correct === 'Der'));
+});
+
+// ── separable verbs ─────────────────────────────────────────
+// A form-to-lemma map cannot join "steige" to the "um" four words later. This
+// does, using German's own bracket: the stranded prefix ends its clause.
+const SEPV = { verbs: {
+  ankommen: { pre: 'an', sep: true }, aussteigen: { pre: 'aus', sep: true },
+  aufstehen: { pre: 'auf', sep: true }, anschauen: { pre: 'an', sep: true },
+  umsteigen: { pre: 'um', sep: true }, mitkommen: { pre: 'mit', sep: true },
+  vorbeikommen: { pre: 'vorbei', sep: true }, weitergehen: { pre: 'weiter', sep: true },
+  umarmen: { pre: 'um', sep: false },
+} };
+const LEMMAS = {
+  kommt: 'kommen', komme: 'kommen', kommen: 'kommen',
+  steige: 'steigen', steigt: 'steigen', steigen: 'steigen',
+  stehe: 'stehen', steht: 'stehen', schaut: 'schauen', geht: 'gehen',
+  mann: 'Mann', perron: 'Perron', boden: 'Boden', pass: 'Pass', zug: 'Zug',
+};
+const fakeResolve = (raw) => LEMMAS[String(raw).replace(/[.,!?]/g, '').toLowerCase()] || null;
+const bind = (text) => {
+  const toks = tokenize(text);
+  const m = separableBindings(toks, fakeResolve, SEPV);
+  return [...m.entries()].map(([i, l]) => [toks[i].raw, l]);
+};
+
+test('the prefix at the end of the clause joins the verb at the front', () => {
+  assert.deepEqual(bind('Der Zug kommt in Luzern an.'), [['kommt', 'ankommen'], ['an', 'ankommen']]);
+  assert.deepEqual(bind('Ich steige in Zürich um.'), [['steige', 'umsteigen'], ['um', 'umsteigen']]);
+  assert.deepEqual(bind('Die Frau schaut meinen Pass an.'), [['schaut', 'anschauen'], ['an', 'anschauen']]);
+  assert.deepEqual(bind('Ich stehe auf.'), [['stehe', 'aufstehen'], ['auf', 'aufstehen']]);
+});
+
+test('a preposition that merely looks like a prefix is left alone', () => {
+  // This is the case the naive "any prefix after a verb" rule gets wrong, and
+  // it is why the rule is end-of-clause instead.
+  assert.deepEqual(bind('Ich stehe auf dem Perron.'), []);
+  assert.deepEqual(bind('Ich schaue auf den Boden.'), []);
+});
+
+test('the LAST prefix wins, not the first thing that looks like one', () => {
+  // "Ein Mann kommt an mir vorbei" is vorbeikommen. Binding to the an would
+  // name the wrong verb, and forms.py's own report makes exactly that mistake.
+  assert.deepEqual(bind('Ein Mann kommt an mir vorbei.'),
+    [['kommt', 'vorbeikommen'], ['vorbei', 'vorbeikommen']]);
+});
+
+test('the bracket closes at the clause, not at the sentence', () => {
+  const got = bind('Ich steige aus, und er geht weiter.');
+  assert.deepEqual(got, [['steige', 'aussteigen'], ['aus', 'aussteigen'],
+                         ['geht', 'weitergehen'], ['weiter', 'weitergehen']]);
+});
+
+test('an inseparable prefix verb never binds', () => {
+  // umarmen has a prefix and it does not come off, so a stray "um" at the end
+  // of a clause must not drag it in.
+  assert.deepEqual(bind('Er kommt um.'), []);
+});
+
+test('nothing to bind is not an error', () => {
+  assert.deepEqual(bind('Der Zug ist gross.'), []);
+  assert.deepEqual(bind(''), []);
+  assert.deepEqual([...separableBindings(tokenize('Ich stehe auf.'), fakeResolve, null).entries()], []);
+});
+
+// ── principal parts ─────────────────────────────────────────
+// The second verb-drill shape, for languages a conjugation table cannot hold.
+// Every assertion here is about a form being STATED: nothing in this path may
+// derive a verb form, because a plausible guess is the learner's own mistake
+// handed back as the right answer.
+const PARTS = {
+  kind: 'principal-parts',
+  verbs: {
+    sprechen: { en: 'to speak', pres3: 'spricht', pres2: 'sprichst', past3: 'sprach', pp: 'gesprochen', aux: 'hat', imp: 'sprich' },
+    fahren: { en: 'to go', pres3: 'fährt', pres2: 'fährst', past3: 'fuhr', pp: 'gefahren', aux: 'ist', imp: 'fahr' },
+    nehmen: { en: 'to take', pres3: 'nimmt', pres2: 'nimmst', past3: 'nahm', pp: 'genommen', aux: 'hat', imp: 'nimm' },
+    machen: { en: 'to do', pres3: 'macht', pres2: 'machst', past3: 'machte', pp: 'gemacht', aux: 'hat', imp: 'mach' },
+    kommen: { en: 'to come', pres3: 'kommt', pres2: 'kommst', past3: 'kam', pp: 'gekommen', aux: 'ist', imp: 'komm' },
+    umsteigen: { en: 'to change trains', pres3: 'steigt um', pres2: 'steigst um', past3: 'stieg um', pp: 'umgestiegen', aux: 'ist', imp: 'steig um', pre: 'um', sep: true },
+    umarmen: { en: 'to hug', pres3: 'umarmt', pres2: 'umarmst', past3: 'umarmte', pp: 'umarmt', aux: 'hat', imp: 'umarme', pre: 'um', sep: false },
+  },
+};
+const onlyMode = (m, n = 6) => verbPartItems(PARTS, n, [m]);
+
+test('a course with the file but no verbs drills nothing rather than breaking', () => {
+  assert.deepEqual(verbPartItems({ kind: 'principal-parts', verbs: {} }, 10), []);
+  assert.deepEqual(verbPartItems(null, 10), []);
+  assert.deepEqual(verbPartItems({ kind: 'principal-parts', verbs: PARTS.verbs, drill: ['nichtda'] }, 10), []);
+});
+
+test('every answer is a stated form, never a derived one', () => {
+  for (const it of verbPartItems(PARTS, 60)) {
+    const v = PARTS.verbs[it.verb];
+    const stated = [v.pres3, v.pres2, v.past3, v.pp, v.aux, v.imp, it.verb,
+      `${v.aux} ${v.pp}`, `er ${v.pres3}`];
+    assert.ok(stated.includes(it.correct), `${it.mode} produced ${it.correct}`);
+    assert.ok(it.options.includes(it.correct));
+  }
+});
+
+test('the perfect carries its own auxiliary', () => {
+  for (const it of onlyMode('perfect')) {
+    const v = PARTS.verbs[it.verb];
+    assert.equal(it.correct, `${v.aux} ${v.pp}`);
+  }
+  // haben and sein are both real answers, so the choice is two, not four.
+  for (const it of onlyMode('aux')) {
+    assert.deepEqual(it.options.slice().sort(), ['hat', 'ist']);
+    assert.equal(it.correct, PARTS.verbs[it.verb].aux);
+  }
+});
+
+test('the reading direction asks a form and answers the lemma', () => {
+  for (const it of onlyMode('infinitive')) {
+    const v = PARTS.verbs[it.verb];
+    assert.equal(it.correct, it.verb);
+    assert.ok([v.pres3, v.past3, v.pp].includes(it.prompt));
+    assert.equal(it.options.length, 4);
+  }
+});
+
+test('the prefix question is asked of separable AND inseparable verbs', () => {
+  // um- comes off umsteigen and does not come off umarmen. If the mode only
+  // ever ran on separable verbs the answer would always be the split one and
+  // it could be played without reading the card.
+  const seen = new Set(onlyMode('separable', 24).map((i) => i.verb));
+  assert.ok(seen.has('umsteigen'));
+  assert.ok(seen.has('umarmen'));
+  for (const it of onlyMode('separable', 24)) {
+    const v = PARTS.verbs[it.verb];
+    assert.equal(it.correct, `er ${v.pres3}`);
+    assert.equal(it.options.length, 2);
+  }
+  // A verb with no prefix has no question here.
+  assert.deepEqual(verbPartItems({ kind: 'principal-parts', verbs: { machen: PARTS.verbs.machen } }, 4, ['separable']), []);
+});
+
+test('distractors come from the same slot, so nothing is spottable', () => {
+  for (const it of onlyMode('past', 12)) {
+    for (const o of it.options) {
+      assert.ok(Object.values(PARTS.verbs).some((v) => v.past3 === o), `${o} is not a past form`);
+    }
+    assert.equal(new Set(it.options).size, it.options.length);
+  }
+});
+
+test('a mode whose field is missing is skipped, never guessed', () => {
+  const thin = { kind: 'principal-parts', verbs: { gehen: { en: 'to go', pres3: 'geht', past3: 'ging', pp: 'gegangen', aux: 'ist' } } };
+  assert.deepEqual(verbPartItems(thin, 4, ['imperative']), []);
+  assert.deepEqual(verbPartItems(thin, 4, ['present2']), []);
+});
+
+test('every mode either builds a whole item or none at all', () => {
+  for (const m of PART_MODES) {
+    for (const it of onlyMode(m, 8)) {
+      assert.equal(it.mode, m);
+      assert.ok(it.verb && it.prompt && it.correct);
+      assert.ok(it.options.length >= 2);
+    }
+  }
 });
 
 console.log(`${passed} passed${process.exitCode ? ', SOME FAILED' : ''}`);

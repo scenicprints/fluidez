@@ -11,7 +11,7 @@ import { content, lessonsByPhase, checkForContentUpdate, cacheSize, packVersion,
 import { mascotMini, mascotSvg, createMascot, daysBetween } from './mascot.js';
 import {
   memoryStrength, band, calcFluency, fadingWords, dueWords, dueCount, leeches, tokenize, cleanWord,
-  conjugate, generateExercises, gradeTyped, orderCandidates, scramble, shuffle, pick,
+  conjugate, verbPartItems, separableBindings, generateExercises, gradeTyped, orderCandidates, scramble, shuffle, pick,
   phaseName, phaseDesc, levelRank,
 } from './engine.js';
 
@@ -186,7 +186,9 @@ export function renderToday() {
   const guard = (fn) => (raw ? openBau : fn);
   add('scenes', 'ic-scenes', t('scenes'), t('scenesCount', { a: content.scenarios.length, b: (prog.scenariosDone || []).length }), guard(() => showScreen('scenes')));
   add('review', 'ic-target', t('review'), owed ? t('due', { n: owed }) : t('nothingDue'), guard(() => startReview()));
-  add('verbs', 'ic-verb', t('verbs'), content.verbs ? t('conjugation') : '—', guard(() => startVerbs()));
+  add('verbs', 'ic-verb', t('verbs'),
+    content.verbs ? t(content.verbs.kind === 'principal-parts' ? 'principalParts' : 'conjugation') : '—',
+    guard(() => startVerbs()));
   add('order', 'ic-order', t('order'), t('buildIt'), guard(() => startOrder()));
   add('audio', 'ic-ear', t('listening'), t('dictation'), guard(() => startDictation()));
   add('audio', 'ic-mic', t('shadowing'), t('sayItBack'), guard(() => startShadow()));
@@ -307,7 +309,7 @@ export function openLesson_(lesson) {
   // Keep the entry, not the spelling the lesson happened to use, so the
   // warm-up and the reader strengthen one memory rather than two.
   const words = [...new Set((lesson.warmup || [])
-    .map((w) => resolve(cleanWord(w)))
+    .map((w) => resolve(w))
     .filter(Boolean))];
   if (!words.length) return openReader(lesson);
   warm = { lesson, words, i: 0 };
@@ -379,18 +381,24 @@ export function openReader(lesson) {
   for (const sn of lesson.sentences) {
     const p = el('p', 'line');
     const s = el('span', 's');
-    for (const tok of tokenize(sn.es)) {
+    const toks = tokenize(sn.es);
+    // A separable verb is one word written in two places. Both halves open the
+    // same card and both are marked, so the stranded prefix at the end of the
+    // clause is visibly part of the verb at the front rather than a stray
+    // little word — which is the single most alien thing about German order.
+    const bound = separableBindings(toks, resolve, content.verbs);
+    toks.forEach((tok, i) => {
       // resolve(), not a bare dictionary hit: "hablas" belongs to hablar and
       // has to underline, open and count as the same word.
-      const key = tok.isWord ? resolve(cleanWord(tok.raw)) : null;
+      const key = bound.get(i) || (tok.isWord ? resolve(tok.raw) : null);
       if (key) {
-        const w = el('span', 'w' + strengthClass(key), tok.raw);
+        const w = el('span', 'w' + strengthClass(key) + (bound.has(i) ? ' wsep' : ''), tok.raw);
         w.addEventListener('click', () => openWord(key));
         s.appendChild(w);
       } else {
         s.appendChild(document.createTextNode(tok.raw));
       }
-    }
+    });
     if (canAudio()) {
       const b = el('button', 'spk', '🔊');
       b.type = 'button';
@@ -424,10 +432,12 @@ export function openReader(lesson) {
   // Reading it counts: every dictionary word in the lesson is an exposure.
   const seen = new Set();
   for (const sn of lesson.sentences) {
-    for (const tok of tokenize(sn.es)) {
-      const key = tok.isWord ? resolve(cleanWord(tok.raw)) : null;
+    const toks = tokenize(sn.es);
+    const bound = separableBindings(toks, resolve, content.verbs);
+    toks.forEach((tok, i) => {
+      const key = bound.get(i) || (tok.isWord ? resolve(tok.raw) : null);
       if (key) seen.add(key);
-    }
+    });
   }
   store.recordExposure([...seen]);
   store.progress.markRead(lesson.id);
@@ -797,7 +807,15 @@ function answerScene(btn, option, opts, pad) {
   fb.innerHTML = `<b>${option.verdict === 'good' ? 'Perfect' : option.verdict === 'bad' ? 'Not that' : 'Understandable'}</b><span>${md(option.feedback)}</span>`;
   pad.appendChild(fb);
 
-  store.recordExposure([...new Set(tokenize(option.es).filter((t) => t.isWord).map((t) => resolve(cleanWord(t.raw))).filter(Boolean))]);
+  const optToks = tokenize(option.es);
+  const optBound = separableBindings(optToks, resolve, content.verbs);
+  store.recordExposure([...new Set(optToks
+    .map((t, i) => optBound.get(i) || (t.isWord ? resolve(t.raw) : null))
+    .filter(Boolean))]);
+  // A scene meets words too, so it can be the thing that pushes a pattern over
+  // its threshold. Without this the pattern sat at "0 more words to go" and
+  // stayed locked until the next lesson happened to be read.
+  checkPatterns();
   activity();
 
   const next = el('button', 'go');
@@ -1233,6 +1251,10 @@ export function startReview() {
   const vocab = store.vocab.all();
   const queue = dueWords(vocab, content.dict, Date.now(), 30);
   const items = generateExercises(vocab, content.dict, content.lessons, 12, kinds, queue);
+  // generateExercises used to fall back to a hardcoded Spanish sentence when it
+  // could build nothing, which in a German course taught Spanish. It returns
+  // nothing now and this says so instead.
+  if (!items.length) return toast(t('nothingToReview'));
   startDrill({
     title: 'Review', sub: queue.length ? `${queue.length} due` : 'Weakest words first', items,
     render: (pad, item, done) => renderExercise(pad, item, done),
@@ -1275,7 +1297,7 @@ function renderExercise(pad, item, done) {
 }
 
 function renderTyped(pad, item, done) {
-  pad.appendChild(el('p', 'label', 'Write this in Spanish'));
+  pad.appendChild(el('p', 'label', t('writeIn', { lang: content.language?.name || 'the language' })));
   pad.appendChild(el('p', 'prompt-en en', item.english));
   const input = el('input', 'typebox');
   input.type = 'text';
@@ -1308,7 +1330,12 @@ function renderTyped(pad, item, done) {
 // ── verbs ───────────────────────────────────────────────────
 export function startVerbs() {
   const v = content.verbs;
-  if (!v) return toast('This course has no verb trainer.');
+  if (!v) return toast(t('verbsNone'));
+  // Two shapes of verb file, because two languages need different drills.
+  // A conjugation table is right for Spanish and cannot hold German; the
+  // reasoning is written out over verbPartItems() in engine.js. Branching here
+  // rather than rewriting keeps the published Spanish course untouched.
+  if (v.kind === 'principal-parts') return startVerbParts(v);
   const items = [];
   for (let i = 0; i < 10; i++) {
     const verb = pick(v.drill);
@@ -1353,6 +1380,64 @@ function renderVerb(pad, item, done) {
       fb.innerHTML = `<b>${right ? 'Correct' : 'Not that one'}</b><span>${esc(item.subject)} <b>${esc(item.correct)}</b>.</span>`;
       pad.appendChild(fb);
       nextButton(pad, 'Next verb');
+    });
+    choices.appendChild(b);
+  }
+  pad.appendChild(choices);
+}
+
+// ── verbs, principal-parts shape ────────────────────────────
+// One stated part of a verb is missing and you pick it. Same card, choices and
+// feedback the conjugation drill uses, so there is no new CSS and the two
+// shapes feel like one tile.
+const PART_LABEL = {
+  present3: 'vpPresent3', present2: 'vpPresent2', past: 'vpPast',
+  perfect: 'vpPerfect', aux: 'vpAux', infinitive: 'vpInfinitive',
+  imperative: 'vpImperative', separable: 'vpSeparable',
+};
+
+function startVerbParts(v) {
+  const items = verbPartItems(v, 10);
+  // A course can ship the file before it ships the verbs. Say so plainly
+  // rather than opening a drill with nothing in it.
+  if (!items.length) return toast(t('verbsEmpty'));
+  startDrill({ title: t('verbs'), sub: t('principalParts'), items, render: renderVerbParts });
+}
+
+function renderVerbParts(pad, item, done) {
+  // The gloss would hand over the answer when the question IS the verb.
+  const gloss = item.mode === 'infinitive' ? '' : item.en;
+  const card = el('div', 'vcard');
+  card.innerHTML =
+    `<p class="label" style="margin-bottom:12px">${esc(t(PART_LABEL[item.mode] || 'principalParts'))}</p>` +
+    `<div class="inf es">${esc(item.prompt)}</div>` +
+    (gloss ? `<div class="subjpill">${esc(gloss)}</div>` : '');
+  pad.appendChild(card);
+
+  const choices = el('div', 'choices');
+  for (const opt of item.options) {
+    const b = el('button', 'ch', opt);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      const right = opt === item.correct;
+      choices.querySelectorAll('.ch').forEach((c) => {
+        c.disabled = true;
+        if (c.textContent === item.correct && !right) c.classList.add('right');
+        else if (c !== b) c.classList.add('dim');
+      });
+      b.classList.add(right ? 'right' : 'wrongc');
+      // Same as the conjugation drill: the verb trainer scores itself and does
+      // not touch vocabulary memory.
+      done(right, null);
+      store.progress.bump('verbsTotal');
+      if (right) store.progress.bump('verbsCorrect');
+      // Lead with what was asked, not with the verb: in the reading direction
+      // the verb IS the answer, and "umarmen · umarmen" says nothing.
+      const fb = el('div', `fb show ${right ? 'good' : 'bad'}`);
+      fb.innerHTML = `<b>${esc(t(right ? 'vpRight' : 'vpWrong'))}</b>` +
+        `<span>${esc(item.prompt)} · <b>${esc(item.correct)}</b>${item.en ? ` — ${esc(item.en)}` : ''}</span>`;
+      pad.appendChild(fb);
+      nextButton(pad, t('vpNext'));
     });
     choices.appendChild(b);
   }

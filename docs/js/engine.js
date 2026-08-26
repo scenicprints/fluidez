@@ -83,6 +83,30 @@ export const isKnown = (m) => m >= 0.2;
 // ── TEXT ────────────────────────────────────────────────────
 const PUNCT = /[¿¡.,;:!?"'()«»‘’“”\-]/g;
 export const cleanWord = (w) => w.toLowerCase().replace(PUNCT, '');
+/** The same word with its punctuation gone but its capitals intact. */
+export const bareWord = (w) => String(w ?? '').replace(PUNCT, '');
+
+/**
+ * Which key in `dict` this written word is, exact spelling first and
+ * lower-cased second.
+ *
+ * German capitalises every noun, so a lower-cased-only lookup misses all of
+ * them — 217 of the 635 words in the Swiss course, including Mann, Frau and
+ * Bahnhof. Worse, for the pairs where the capital IS the word it answered the
+ * wrong one: der Morgen is the morning and morgen is tomorrow, der Weg is the
+ * way and weg means gone.
+ *
+ * Trying the exact spelling first fixes both and changes nothing for a
+ * dictionary written in lower case, as the Spanish one is: "Llego" misses
+ * `Llego`, falls to `llego`, and lands exactly where it always did.
+ */
+export const dictKey = (dict, raw) => {
+  if (!dict || !raw) return null;
+  const bare = bareWord(raw);
+  if (dict[bare]) return bare;
+  const low = bare.toLowerCase();
+  return dict[low] ? low : null;
+};
 
 // Any Unicode letter, not a hand-listed Spanish alphabet. The original class
 // was [a-záéíóúüñ], which has no ä or ö — so every Luzerndütsch word carrying
@@ -102,6 +126,74 @@ export function tokenize(text) {
   while ((m = TOKEN.exec(text)) !== null) {
     const raw = m[1];
     out.push({ raw, isWord: HAS_LETTER.test(raw), lower: raw.toLowerCase() });
+  }
+  return out;
+}
+
+// ── SEPARABLE VERBS ─────────────────────────────────────────
+/**
+ * Which tokens of a sentence are the two halves of one separable verb.
+ *
+ *     Ich steige in Zürich um.
+ *
+ * *steige* and *um* are one word, `umsteigen`, and they are four tokens apart.
+ * A form-to-lemma map is a dictionary of single words and cannot join them —
+ * so this joins them here, where the whole sentence is in hand.
+ *
+ * The rule is German's own bracket: **a stranded prefix sits at the end of its
+ * clause.** So look at the last word of each clause, and if it is a prefix that
+ * would build a real separable verb out of some earlier verb in the same
+ * clause, the two belong together.
+ *
+ * That end-of-clause rule is what makes it safe. The naive version — any
+ * prefix-looking word anywhere after a verb — gets "Ein Mann kommt an mir
+ * vorbei" wrong, binding *kommt* to the preposition *an* when the verb is
+ * vorbeikommen. Here the last word is *vorbei*, the *an* is left alone, and
+ * the answer is right. "Ich stehe auf dem Perron" ends in *Perron*, so nothing
+ * binds and *auf* stays a preposition; "Ich stehe auf" ends in *auf*, so it
+ * does.
+ *
+ * Returns a Map of token index -> the separable lemma, covering both halves.
+ */
+export function separableBindings(tokens_, resolveFn, verbs) {
+  const table = (verbs && verbs.verbs) || {};
+  const out = new Map();
+  if (!tokens_ || !tokens_.length) return out;
+
+  const isSeparable = (lemma) => {
+    const v = table[lemma];
+    return !!(v && v.sep);
+  };
+
+  // Clauses, because the bracket closes at the end of the clause and not at
+  // the end of the sentence: "Ich steige aus, und er bleibt sitzen."
+  let start = 0;
+  const clauses = [];
+  tokens_.forEach((t, i) => {
+    if (!t.isWord && /[,;:.!?]/.test(t.raw)) {
+      if (i > start) clauses.push([start, i]);
+      start = i + 1;
+    }
+  });
+  if (start < tokens_.length) clauses.push([start, tokens_.length]);
+
+  for (const [from, to] of clauses) {
+    let last = -1;
+    for (let i = to - 1; i >= from; i--) {
+      if (tokens_[i].isWord) { last = i; break; }
+    }
+    if (last <= from) continue;
+    const prefix = tokens_[last].lower;
+    for (let i = from; i < last; i++) {
+      if (!tokens_[i].isWord) continue;
+      const lemma = resolveFn(tokens_[i].raw);
+      if (!lemma) continue;
+      const joined = prefix + lemma;
+      if (!isSeparable(joined)) continue;
+      out.set(i, joined);
+      out.set(last, joined);
+      break;                       // the finite verb is the first one that fits
+    }
   }
   return out;
 }
@@ -160,6 +252,126 @@ export function conjugate(verbs, verb, tense, subjectIndex) {
   // Future tense builds on the whole infinitive, not the stem.
   if (tense === 'future') return verb + ending.slice(kind.length);
   return verb.slice(0, -2) + ending;
+}
+
+// ── PRINCIPAL PARTS ─────────────────────────────────────────
+// A second shape of verb drill, for languages a conjugation table cannot hold.
+//
+// German is the case it was built for. Three of its five useful tenses are not
+// conjugations at all — Perfekt is an auxiliary plus a participle, Futur and
+// Konjunktiv II are an auxiliary plus an infinitive — and in a real clause the
+// two halves sit apart with everything else between them. A card offering four
+// single-word buttons cannot show that without lying about word order, and
+// word order is the thing that matters. Präteritum fits on a button but Swiss
+// speakers write it and do not say it. What is left is the present, where the
+// endings arrive free from reading and only the strong-verb stem changes are
+// hard.
+//
+// So the drill asks for the principal parts instead: sprechen, spricht,
+// sprach, hat gesprochen. Every one of those is STATED in verbs.json. Nothing
+// here derives a form, because ablaut has no rule and a plausible guess
+// (er sprecht) is exactly the mistake the learner already makes — teaching it
+// back to them is worse than having no trainer. conjugate() is never called on
+// this path, so the regular-table fallback that once produced "cerro" cannot
+// happen by construction.
+export const PART_MODES = [
+  'present3', 'present2', 'past', 'perfect',
+  'aux', 'infinitive', 'imperative', 'separable',
+];
+
+// Which stated field each mode asks for. A mode whose field is missing on a
+// verb is skipped rather than guessed.
+const PART_SLOT = {
+  present3: (v) => v.pres3,
+  present2: (v) => v.pres2,
+  past: (v) => v.past3,
+  perfect: (v) => (v.aux && v.pp ? `${v.aux} ${v.pp}` : null),
+  imperative: (v) => v.imp,
+};
+
+// These two build DISTRACTORS and nothing else. The right answer is always the
+// stated pres3, so a prefix rule being wrong costs a bad wrong-option and can
+// never teach a bad right one.
+const joinPrefix = (pre, separated) => {
+  const parts = String(separated).split(' ');
+  return parts.length === 2 && parts[1] === pre ? pre + parts[0] : null;
+};
+const splitPrefix = (pre, joined) =>
+  String(joined).startsWith(pre) && joined.length > pre.length
+    ? `${joined.slice(pre.length)} ${pre}`
+    : null;
+
+function buildPart(mode, names, table) {
+  const name = pick(names);
+  const v = table[name];
+  if (!v) return null;
+  const en = v.en || '';
+
+  // haben or sein. Two options, because there are two answers in the language.
+  if (mode === 'aux') {
+    if (!v.pp || !v.aux) return null;
+    return { mode, verb: name, en, prompt: v.pp, correct: v.aux, options: ['hat', 'ist'] };
+  }
+
+  // The reading direction: you met sprach on the page, which verb was that?
+  // The English gloss is withheld by the renderer here or it gives the answer.
+  if (mode === 'infinitive') {
+    const shown = [v.pres3, v.past3, v.pp].filter(Boolean);
+    const wrongs = shuffle(names.filter((n) => n !== name)).slice(0, 3);
+    if (!shown.length || wrongs.length < 3) return null;
+    return { mode, verb: name, en, prompt: pick(shown), correct: name, options: shuffle([name, ...wrongs]) };
+  }
+
+  // Does the prefix come off? um- does in umsteigen and does not in umarmen,
+  // so it is a fact per verb and no prefix list settles it. Asked of any verb
+  // that HAS a prefix, separable or not, or the mode would always have the
+  // same answer and could be played without reading it.
+  if (mode === 'separable') {
+    if (!v.pre || !v.pres3) return null;
+    const right = v.pres3;
+    const other = v.sep ? joinPrefix(v.pre, right) : splitPrefix(v.pre, right);
+    if (!other || other === right) return null;
+    return {
+      mode, verb: name, en, prompt: name,
+      correct: `er ${right}`, options: shuffle([`er ${right}`, `er ${other}`]),
+    };
+  }
+
+  const slot = PART_SLOT[mode];
+  const correct = slot && slot(v);
+  if (!correct) return null;
+  // Distractors are the SAME slot from other verbs, so every option is shaped
+  // like a real answer and the odd one out cannot be spotted without knowing.
+  const seen = new Set([correct]);
+  const wrongs = [];
+  for (const other of shuffle(names)) {
+    if (wrongs.length >= 3) break;
+    const alt = slot(table[other]);
+    if (alt && !seen.has(alt)) { seen.add(alt); wrongs.push(alt); }
+  }
+  if (wrongs.length < 3) return null;
+  return { mode, verb: name, en, prompt: name, correct, options: shuffle([correct, ...wrongs]) };
+}
+
+/**
+ * Draw `count` principal-parts items from a `kind: "principal-parts"` file.
+ * Returns [] when there is nothing drillable, so a course can ship the file
+ * before it ships the verbs and the tile says so instead of breaking.
+ */
+export function verbPartItems(verbs, count = 10, modes = null) {
+  const table = (verbs && verbs.verbs) || {};
+  const listed = verbs && Array.isArray(verbs.drill) && verbs.drill.length
+    ? verbs.drill : Object.keys(table);
+  const names = listed.filter((n) => table[n]);
+  if (!names.length) return [];
+
+  const kinds = (modes && modes.length) ? modes : PART_MODES;
+  const out = [];
+  for (let i = 0; out.length < count && i < count * 8; i++) {
+    const item = buildPart(kinds[i % kinds.length], names, table);
+    if (item) out.push(item);
+  }
+  return out;
 }
 
 // ── FLUENCY ─────────────────────────────────────────────────
@@ -364,9 +576,12 @@ export function generateExercises(vocab, dict, lessons, count = 12, modes = null
     } else if (kind === 'gap' && sentences.length) {
       const sn = pick(sentences);
       const toks = tokenize(sn.es);
+      // dictKey, not dict[t.lower]: a lower-cased lookup finds no German noun
+      // at all, so every gap item in the Swiss course would have been built
+      // out of the function words.
       const candidates = toks
-        .map((t, at) => ({ ...t, at }))
-        .filter((t) => t.isWord && dict[t.lower]);
+        .map((t, at) => ({ ...t, at, key: dictKey(dict, t.raw) }))
+        .filter((t) => t.isWord && t.key);
       if (candidates.length < 2) continue;
       const target = pick(candidates);
       // Blank the token that was actually chosen, by position.
@@ -381,8 +596,8 @@ export function generateExercises(vocab, dict, lessons, count = 12, modes = null
         kind,
         sentence: toks.map((t, at) => (at === target.at ? ' ______ ' : t.raw)).join(''),
         translation: sn.en,
-        correct: target.lower,
-        options: shuffle([target.lower, ...wrongWords(target.lower)]),
+        correct: target.key,
+        options: shuffle([target.key, ...wrongWords(target.key)]),
       });
 
     } else if (kind === 'type_es' && sentences.length) {
@@ -396,9 +611,11 @@ export function generateExercises(vocab, dict, lessons, count = 12, modes = null
     }
   }
 
-  return out.length
-    ? out
-    : [{ kind: 'type_es', english: 'Hello, how are you?', correct: '¿Cómo estás?' }];
+  // No fallback item. This used to return a hardcoded Spanish sentence when it
+  // could build nothing from the course, which in any other language is the
+  // app teaching the wrong one. An empty list is the honest answer and the
+  // caller says so.
+  return out;
 }
 
 // ── ANSWER GRADING ──────────────────────────────────────────
