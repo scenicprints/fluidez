@@ -61,6 +61,17 @@ export const ALL_FEATURES = [
 const CK = {
   languages: 'fl:c:languages',
   pack: (code) => `fl:c:pack:${code}`,
+  // What we have actually GOT on this device, in about forty bytes. Kept
+  // beside the pack rather than inside it, because the question "is there
+  // anything new?" is asked on every launch and answering it by parsing two
+  // megabytes of stories was both slow and, worse, quietly wrong: a pack
+  // written by the file-by-file path carried no version at all, so the answer
+  // was always "yes, there is something new" and the banner never went away.
+  ver: (code) => `fl:c:ver:${code}`,
+  // The version we downloaded and could NOT keep. Without this the banner
+  // comes back every launch offering something this device has already proved
+  // it has no room for.
+  nofit: (code) => `fl:c:nofit:${code}`,
 };
 
 // Every request is bounded. On a bad connection a hung fetch is far worse
@@ -97,6 +108,64 @@ function cacheRead(k) {
 function cacheWrite(k, v) {
   try { localStorage.setItem(k, JSON.stringify(v)); return true; }
   catch { return false; } // quota — the app still works, it just refetches
+}
+function cacheReadRaw(k) {
+  try { return localStorage.getItem(k); } catch { return null; }
+}
+function cacheWriteRaw(k, v) {
+  try { localStorage.setItem(k, v); return true; } catch { return false; }
+}
+function cacheDrop(k) {
+  try { localStorage.removeItem(k); } catch {}
+}
+
+/**
+ * Put a downloaded course on the device, making room for it if it has to.
+ *
+ * A pack is a couple of megabytes and local storage is a few, so a device
+ * holding two courses can genuinely run out — and the failure is silent and
+ * self-perpetuating: nothing is stored, so the version never moves, so the
+ * app offers the same download again on the next launch, forever. The course
+ * you are NOT reading is the obvious thing to give up: it costs one download
+ * to get back and it is not what is on screen.
+ */
+function storePack(code, pack) {
+  if (cacheWrite(CK.pack(code), pack)) return true;
+
+  const mine = CK.pack(code);
+  let evicted = false;
+  try {
+    // Collect first: removing while iterating the keys skips entries.
+    const others = Object.keys(localStorage)
+      .filter((k) => k.startsWith('fl:c:pack:') && k !== mine);
+    for (const k of others) {
+      const otherCode = k.slice('fl:c:pack:'.length);
+      cacheDrop(k);
+      // Its version stamp goes with it, or that course reports content it no
+      // longer has and can never be told it is behind.
+      cacheDrop(CK.ver(otherCode));
+      cacheDrop(CK.nofit(otherCode));
+      evicted = true;
+    }
+  } catch {}
+
+  return evicted && cacheWrite(mine, pack);
+}
+
+/**
+ * Record what is on the device, or that it would not fit.
+ *
+ * Stamped only on a write that actually succeeded. A version we did not
+ * manage to store is a version we do not have.
+ */
+function stampPack(code, version, stored) {
+  if (stored && version) {
+    cacheWriteRaw(CK.ver(code), String(version));
+    cacheDrop(CK.nofit(code));
+    return;
+  }
+  cacheDrop(CK.ver(code));
+  if (!stored && version) cacheWriteRaw(CK.nofit(code), String(version));
 }
 
 // ── languages ───────────────────────────────────────────────
@@ -194,6 +263,11 @@ export function loadCachedPack(code) {
   const pack = cacheRead(CK.pack(code));
   if (!pack) return false;
   applyPack(pack);
+  // An install from before the stamp existed carries its version inside the
+  // pack. Copy it out the one time it is already parsed, so every later
+  // "anything new?" is a forty-byte read instead of a two-megabyte one.
+  const inside = pack.manifest?.version ?? null;
+  if (inside && !cacheReadRaw(CK.ver(code))) cacheWriteRaw(CK.ver(code), String(inside));
   return true;
 }
 
@@ -233,6 +307,11 @@ function applyPack(pack) {
 }
 
 export function packVersion(code) {
+  const stamped = cacheReadRaw(CK.ver(code));
+  if (stamped) return stamped;
+  // No stamp: either nothing is downloaded, or this is an install old enough
+  // to keep its version inside the pack. Look once — loadCachedPack copies it
+  // out, so this branch runs at most once per device.
   const pack = cacheRead(CK.pack(code));
   return pack ? (pack.manifest?.version ?? null) : null;
 }
@@ -257,13 +336,19 @@ export async function downloadPack(lang, onProgress = () => {}) {
 
 /** The bundled course: one request, then straight into local storage. */
 function applyBundle(lang, bundle, onProgress) {
+  // ONLY what something actually reads: the version, the feature list and the
+  // phrasebook. It used to carry `lessons` and `scenarios` as well — the whole
+  // course, in full, a second time — so every story was written to local
+  // storage twice and the German pack cost 4.34 MB instead of 2.42 MB. Nothing
+  // ever read either field. On a device already holding the other course that
+  // is the difference between fitting and not, and a pack that does not fit is
+  // a pack whose version never moves, which is a download banner that never
+  // goes away. Add nothing here that no screen reads.
   const manifest = {
     version: bundle.version ?? null,
     features: bundle.features || null,
     emergency: bundle.emergency ? true : null,
     emergencyData: bundle.emergency || null,
-    lessons: bundle.lessons,
-    scenarios: bundle.scenarios,
   };
   const pack = {
     language: { ...lang, speech: bundle.speech || lang.speech || null },
@@ -288,7 +373,8 @@ function applyBundle(lang, bundle, onProgress) {
     fetchedAt: Date.now(),
   };
   applyPack(pack);
-  const stored = cacheWrite(CK.pack(lang.code), pack);
+  const stored = storePack(lang.code, pack);
+  stampPack(lang.code, manifest.version, stored);
   const total = pack.lessons.length + pack.scenarios.length;
   onProgress({ phase: 'done', done: total, total, stored });
   return { pack, stored };
@@ -339,11 +425,18 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
     step();
   }
 
+  // A file that would not come down is dropped rather than throwing, because
+  // 120 of 122 stories is a course and no course is not. But it is NOT a
+  // complete download, and stamping a complete version on it would tell the
+  // app it is up to date with stories it has never seen. Counted, and the
+  // stamp is withheld below.
+  let lost = 0;
+
   const lessons = (await batched(lessonEntries, async (entry) => {
     try {
       const j = await getContent(lang, entry.path);
       return asLesson({ ...entry, ...j });
-    } catch { return null; }
+    } catch { lost++; return null; }
     finally { step(); }
   })).filter(Boolean);
 
@@ -351,7 +444,7 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
     try {
       const j = await getContent(lang, entry.path);
       return asScenario({ ...entry, ...j });
-    } catch { return null; }
+    } catch { lost++; return null; }
     finally { step(); }
   })).filter(Boolean);
 
@@ -369,16 +462,50 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
     } catch {}
   }
 
+  // The phrasebook is fetched here too. `manifest.emergency` is a PATH on this
+  // path and the DATA on the bundled one, and only the data was ever read — so
+  // a course assembled file by file showed the Emergency tile with nothing
+  // behind it.
+  let emergency = null;
+  if (manifest.emergency) {
+    try { emergency = await getContent(lang, manifest.emergency); } catch {}
+  }
+
+  // No version in manifest.json — neither course has ever had one there — so
+  // it comes from the sidecar the update check reads, which is the whole point
+  // of stamping it: a pack cached with no version can never be up to date, and
+  // that is a "New lessons are available" banner on every launch, forever.
+  let version = null;
+  try {
+    const v = await getContent(lang, 'version.json', 8000);
+    version = v.version ?? null;
+  } catch {}
+
+  // Same rule as the bundled path: only what a screen reads. A partial
+  // download does not get to record the version it was aiming at, in the pack
+  // OR in the stamp — the two have to agree, or the fallback read in
+  // packVersion() puts back what the stamp deliberately withheld.
+  const packManifest = {
+    version: lost ? null : version,
+    features: manifest.features || null,
+    emergency: emergency ? true : null,
+    emergencyData: emergency,
+  };
+
   // No forms map on this path: it is built by the content repo's CI alongside
   // pack.json, and this branch only runs for content old enough not to have
   // one. Lookups fall back to exact matches, exactly as they used to.
-  const pack = { language: lang, manifest, dict, forms: {}, patterns, lessons, scenarios, verbs, momo,
+  const pack = { language: lang, manifest: packManifest, dict, forms: {}, patterns, lessons, scenarios, verbs, momo,
                  mascot: manifest.mascot || null, phases: manifest.phases || null,
                  ui: manifest.ui || null, icons: manifest.icons || null, fetchedAt: Date.now() };
   applyPack(pack);
-  const stored = cacheWrite(CK.pack(lang.code), pack);
-  onProgress({ phase: 'done', done: total, total, stored });
-  return { pack, stored };
+  const stored = storePack(lang.code, pack);
+  // A partial download is not this version. Leaving it unstamped means the app
+  // knows it is still behind and offers the download again, which is the
+  // truth; stamping it would strand the learner on a course with holes in it.
+  stampPack(lang.code, lost ? null : version, stored);
+  onProgress({ phase: 'done', done: total, total, stored, lost });
+  return { pack, stored, lost };
 }
 
 /**
@@ -388,16 +515,24 @@ async function downloadPackFileByFile(lang, onProgress = () => {}) {
  */
 export async function checkForContentUpdate(lang) {
   const have = packVersion(lang.code);
+  // Downloaded once already and there was no room to keep it. Still an update
+  // — the answer to the question is yes — but not one to keep offering
+  // unprompted, because the same two megabytes will not fit this time either.
+  const noFit = cacheReadRaw(CK.nofit(lang.code));
+  const answer = (remote) => ({
+    available: remote !== null && remote !== have,
+    willNotFit: remote !== null && remote === noFit,
+    have,
+    remote,
+  });
   // A ~60 byte sidecar, so this can run on every launch without costing data.
   try {
     const v = await getContent(lang, 'version.json', 8000);
-    const remote = v.version ?? null;
-    return { available: remote !== null && remote !== have, have, remote };
+    return answer(v.version ?? null);
   } catch { /* older content — fall back to the manifest */ }
   try {
     const manifest = await getContent(lang, 'manifest.json', 8000);
-    const remote = manifest.version ?? null;
-    return { available: remote !== null && remote !== have, have, remote };
+    return answer(manifest.version ?? null);
   } catch {
     return { available: false, offline: true };
   }

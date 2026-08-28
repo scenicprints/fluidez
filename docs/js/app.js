@@ -197,7 +197,11 @@ async function pollVersion() {
 async function pollContent() {
   if (!content.language) return;
   const r = await checkForContentUpdate(content.language);
-  if (r.available) {
+  // `willNotFit` is this exact download already tried and rejected by the
+  // browser for want of room. Offering it again every launch is a banner that
+  // cannot be dismissed by doing what it asks, which is the worst thing a
+  // banner can be. Settings still checks and downloads on request.
+  if (r.available && !r.willNotFit) {
     showUpdateBanner('New lessons are available', async () => {
       $('banner').classList.remove('show');
       toast('Downloading new lessons…');

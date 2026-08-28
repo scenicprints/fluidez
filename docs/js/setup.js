@@ -216,7 +216,7 @@ async function runDownload(lang, standalone) {
   bar.style.width = '0%';
 
   try {
-    const { stored } = await downloadPack(lang, ({ phase, done, total }) => {
+    const { stored, lost } = await downloadPack(lang, ({ phase, done, total }) => {
       const pct = total ? Math.round((done / total) * 100) : 0;
       bar.style.width = `${pct}%`;
       text.textContent = phase === 'manifest'
@@ -224,7 +224,9 @@ async function runDownload(lang, standalone) {
         : phase === 'done' ? 'Ready.' : `${done} of ${total} files`;
     });
     if (!stored) {
-      toast('Downloaded, but this browser would not keep it offline.');
+      toast('Downloaded, but there was no room to keep it offline.', 4200);
+    } else if (lost) {
+      toast(`Downloaded, but ${lost} file${lost === 1 ? '' : 's'} would not come down. Try again on better signal.`, 4200);
     }
     return standalone ? finish({ resumed: true, account }) : afterPack();
   } catch (e) {
