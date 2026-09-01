@@ -672,6 +672,14 @@ button { font-family: inherit; color: inherit; }
 .chip.s2 { border-bottom-color: var(--oro); }
 .chip.s1 { border-bottom-color: var(--barro); }
 
+/* ── before you read ───────────────────────────────────────
+   The card on Today that owns the gap between you and the next story. Jade
+   when there is no gap left, because jade already means "held" everywhere
+   else in the app and this is the same statement about a whole story. */
+.card.prep .go { margin-top: 13px; }
+.card.prep.ready { border-color: var(--jade-d); }
+.card.prep.ready .bar i { background: var(--jade); }
+
 /* ── warm-up ───────────────────────────────────────────── */
 .wu-card {
   width: 100%; min-height: 260px; padding: 28px 22px; border-radius: 18px;

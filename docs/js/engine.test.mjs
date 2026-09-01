@@ -10,6 +10,7 @@ import {
   fadingWords, leeches, gradeTyped, normalizeAnswer, orderCandidates,
   scramble, generateExercises, phaseName, phaseDesc, setPhases,
   verbPartItems, PART_MODES, dictKey, bareWord, separableBindings,
+  storyWords, unknownStoryWords, storyGap, prepLadder,
 } from './engine.js';
 
 let passed = 0;
@@ -646,6 +647,116 @@ test('every mode either builds a whole item or none at all', () => {
       assert.ok(it.options.length >= 2);
     }
   }
+});
+
+// ── before a story ──────────────────────────────────────────
+// A pocket course: enough dictionary to build real distractors, a forms map so
+// resolution is exercised rather than assumed, and a story that uses "que"
+// both on its own and inside "querés".
+const PREP_DICT = {
+  querer: { en: 'to want', pos: 'verb' },
+  que: { en: 'that', pos: 'conj' },
+  agua: { en: 'water', pos: 'noun', g: 'f' },
+  casa: { en: 'house', pos: 'noun', g: 'f' },
+  fresco: { en: 'cool / fresh', pos: 'adj', note: 'Also a fruit drink.' },
+  calle: { en: 'street', pos: 'noun', g: 'f' },
+  tarde: { en: 'afternoon', pos: 'noun', g: 'f' },
+};
+const PREP_FORMS = { querés: 'querer', fresca: 'fresco' };
+const prepResolve = (raw) => {
+  const bare = bareWord(raw).toLowerCase();
+  return PREP_DICT[bare] ? bare : (PREP_FORMS[bare] || null);
+};
+const PREP_LESSON = {
+  sentences: [
+    { es: '¿Querés agua?', en: 'Do you want water?' },
+    { es: 'El agua de la casa está fresca.', en: 'The water in the house is cool.' },
+    { es: 'Que tenga buena tarde.', en: 'Have a good afternoon.' },
+  ],
+};
+
+test('a story lists its words once each, in the order they first appear', () => {
+  assert.deepEqual(storyWords(PREP_LESSON, prepResolve, null),
+    ['querer', 'agua', 'casa', 'fresco', 'que', 'tarde']);
+});
+
+test('the story list is resolved, so an inflected word is its lemma', () => {
+  // "Querés" is the only spelling of querer in the story and it still lands
+  // under the infinitive, which is the entry the reader and the scheduler use.
+  assert.ok(storyWords(PREP_LESSON, prepResolve, null).includes('querer'));
+  assert.ok(!storyWords(PREP_LESSON, prepResolve, null).includes('querés'));
+});
+
+test('words you are already holding are not re-taught', () => {
+  const vocab = {
+    agua: { exposures: 6, hits: 2, lastSeen: NOW },   // strong
+    casa: { exposures: 1, lastSeen: NOW - 72 * HOUR },  // long faded
+  };
+  const owed = unknownStoryWords(PREP_LESSON, vocab, PREP_DICT, prepResolve, null, NOW);
+  assert.ok(!owed.includes('agua'));
+  assert.ok(owed.includes('casa'));
+  assert.equal(owed.length, 5);
+});
+
+test('a word with no dictionary entry is never owed', () => {
+  const lesson = { sentences: [{ es: 'Managua es grande.', en: 'Managua is big.' }] };
+  assert.deepEqual(unknownStoryWords(lesson, {}, PREP_DICT, prepResolve, null, NOW), []);
+});
+
+test('the gap blanks the word by position, never by substring', () => {
+  // The trap: "que" is inside "Querés". Replacing the first match would gut the
+  // verb in sentence one and leave the real "Que" standing.
+  const gap = storyGap('que', PREP_LESSON, prepResolve, null);
+  assert.equal(gap.sentence, ' ______  tenga buena tarde.');
+  assert.equal(gap.translation, 'Have a good afternoon.');
+});
+
+test('the gap comes from the story, and there is none when no line is short enough', () => {
+  const gap = storyGap('agua', PREP_LESSON, prepResolve, null);
+  assert.ok(gap.sentence.includes('______'));
+  assert.ok(!gap.sentence.includes('agua'));
+  assert.equal(storyGap('agua', PREP_LESSON, prepResolve, null, 1), null);
+  assert.equal(storyGap('calle', PREP_LESSON, prepResolve, null), null);
+});
+
+test('a ladder meets the word first and ends in its own story line', () => {
+  const rungs = prepLadder('agua', PREP_LESSON, PREP_DICT, prepResolve, null, ['casa', 'calle']);
+  assert.deepEqual(rungs.map((r) => r.kind), ['meet', 'es_en', 'en_es', 'gap']);
+  for (const r of rungs) assert.equal(r.word, 'agua');
+  assert.ok(rungs[3].sentence.includes('______'));
+});
+
+test('a word the story gives no usable line for gets three rungs, not a fake fourth', () => {
+  const rungs = prepLadder('calle', PREP_LESSON, PREP_DICT, prepResolve, null);
+  assert.deepEqual(rungs.map((r) => r.kind), ['meet', 'es_en', 'en_es']);
+});
+
+test('every asked rung offers its own answer', () => {
+  for (const w of ['agua', 'casa', 'fresco', 'tarde']) {
+    for (const r of prepLadder(w, PREP_LESSON, PREP_DICT, prepResolve, null, ['agua', 'casa'])) {
+      if (r.kind === 'meet') continue;
+      assert.ok(r.options.includes(r.correct), `${w} ${r.kind} lost its answer`);
+      assert.ok(r.options.length >= 2);
+      assert.equal(new Set(r.options).size, r.options.length, `${w} ${r.kind} repeats an option`);
+    }
+  }
+});
+
+test('a distractor never means the same thing as the answer', () => {
+  // Two entries glossed the same would make one of the four choices right and
+  // marked wrong, which is the one failure a learner cannot argue with.
+  const dict = { ...PREP_DICT, agüita: { en: 'water', pos: 'noun', g: 'f' } };
+  for (let i = 0; i < 40; i++) {
+    for (const r of prepLadder('agua', PREP_LESSON, dict, prepResolve, null)) {
+      if (r.kind === 'meet') continue;
+      assert.ok(!r.options.includes('agüita'));
+      assert.equal(r.options.filter((o) => o === 'water').length, r.kind === 'es_en' ? 1 : 0);
+    }
+  }
+});
+
+test('a word outside the dictionary has no ladder at all', () => {
+  assert.deepEqual(prepLadder('managua', PREP_LESSON, PREP_DICT, prepResolve, null), []);
 });
 
 console.log(`${passed} passed${process.exitCode ? ', SOME FAILED' : ''}`);

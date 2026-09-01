@@ -13,6 +13,7 @@ import {
   memoryStrength, band, calcFluency, fadingWords, dueWords, dueCount, leeches, tokenize, cleanWord,
   conjugate, verbPartItems, separableBindings, generateExercises, gradeTyped, orderCandidates, scramble, shuffle, pick,
   phaseName, phaseDesc, levelRank,
+  storyWords, unknownStoryWords, prepLadder,
 } from './engine.js';
 
 let momo = null;
@@ -107,6 +108,14 @@ function paintLevel() {
 }
 
 // ══ TODAY ═══════════════════════════════════════════════════
+/**
+ * The story Today is pointing at: the first unread one, or the last one again
+ * once the course is finished. Both cards on Today have to agree about which
+ * story that is, or the prep teaches the words for one and the button opens
+ * another.
+ */
+const nextStory = (read) => content.lessons.find((l) => !read.includes(l.id)) || content.lessons[0];
+
 export function renderToday() {
   paintLevel();
   const pad = $('todayPad');
@@ -156,9 +165,39 @@ export function renderToday() {
     </div>`;
   pad.appendChild(card);
 
+  // ── before you read ──
+  // The story is only worth opening if its words are already yours, so the
+  // gap between the two gets a card of its own, above the story it belongs to.
+  // Everything on it is recomputed from the vocabulary on every render, so
+  // walking out of a prep session halfway and coming back resumes by
+  // arithmetic — there is no session to save and none to get out of date.
+  if (content.has('reader') && content.lessons.length && !underConstruction()) {
+    const next = nextStory(read);
+    const vocab = store.vocab.all();
+    const all = storyWords(next, resolve, content.verbs).filter((w) => content.dict[w]);
+    const todo = unknownStoryWords(next, vocab, content.dict, resolve, content.verbs);
+    const pct = all.length ? Math.round(((all.length - todo.length) / all.length) * 100) : 100;
+    const card2 = el('div', 'card prep' + (todo.length ? ' tap' : ' ready'));
+    card2.innerHTML = `
+      <p class="label">${esc(t('prepLabel'))}</p>
+      <div class="cont-title es">${esc(next.title)}</div>
+      <div class="sub">${esc(todo.length
+        ? t('prepGap', { n: todo.length, a: all.length })
+        : t('prepReady', { a: all.length }))}</div>
+      <div class="bar"><i style="width:${pct}%"></i></div>` +
+      (todo.length
+        ? `<button class="go" type="button">${esc(t('prepGo', { n: Math.min(todo.length, PREP_BATCH) }))}</button>`
+        : '');
+    // No button when there is nothing owed: the continue card directly below
+    // already starts the story, and two buttons doing one thing is a choice
+    // that is not a choice.
+    if (todo.length) card2.addEventListener('click', () => startPrep(next));
+    pad.appendChild(card2);
+  }
+
   // continue
   if (content.has('reader') && content.lessons.length) {
-    const next = content.lessons.find((l) => !read.includes(l.id)) || content.lessons[0];
+    const next = nextStory(read);
     const done = read.includes(next.id);
     const cont = el('div', 'card cont tap');
     cont.innerHTML = `
@@ -297,6 +336,187 @@ export function renderPath() {
 
     unlocked = lessons.every((l) => read.includes(l.id));
   }
+}
+
+// ══ BEFORE YOU READ ═════════════════════════════════════════
+// Learn every word of the next story before opening it.
+//
+// The warm-up below this asks nothing and covers the handful of words a story
+// hammers. This covers all of them and does not release one until it has been
+// recognised, produced and read in the line the story uses it in — and a wrong
+// answer sends the word back to the beginning of its own ladder rather than
+// asking the same question until it is guessed.
+//
+// Six at a time, on purpose. A story can owe forty words and forty introduced
+// in a row is a list, not a lesson; six met together and then told apart is
+// the thing that has to happen anyway when they turn up in one paragraph.
+const PREP_BATCH = 6;
+
+let prep = null;
+
+export function startPrep(lesson) {
+  const todo = unknownStoryWords(lesson, store.vocab.all(), content.dict, resolve, content.verbs);
+  if (!todo.length) return openReader(lesson);
+  prep = { lesson, remaining: todo, cards: new Map(), queue: [], batchSize: 0, learned: 0 };
+  $('prepTitle').textContent = lesson.title;
+  showScreen('prep');
+  prepBatch();
+}
+
+function prepBatch() {
+  const p = prep;
+  const words = p.remaining.slice(0, PREP_BATCH);
+  p.remaining = p.remaining.slice(words.length);
+  p.batchSize = words.length;
+  p.learned = 0;
+  p.cards = new Map(words.map((w) => [w, {
+    step: 0,
+    // The batch is its own distractor pool: these are the words about to be
+    // confused with each other.
+    ladder: prepLadder(w, p.lesson, content.dict, resolve, content.verbs, words),
+  }]));
+  // One rotating queue, so the batch is asked a rung at a time: meet all six,
+  // recognise all six, produce all six, then read all six in the story.
+  p.queue = [...words];
+  paintPrep();
+}
+
+function paintPrep() {
+  const p = prep;
+  if (!p.queue.length) return prepBatchEnd();
+  const card = p.cards.get(p.queue[0]);
+  const item = card.ladder[card.step];
+  $('prepCount').textContent = `${p.learned} / ${p.batchSize}`;
+  $('prepSub').textContent = t('prepLeft', { n: p.remaining.length + p.batchSize - p.learned });
+  $('prepProg').style.width = `${Math.round((p.learned / Math.max(1, p.batchSize)) * 100)}%`;
+  const pad = $('prepPad');
+  clear(pad);
+  if (item.kind === 'meet') renderPrepMeet(pad, item);
+  else renderPrepChoice(pad, item);
+}
+
+function prepAdvance(correct) {
+  const p = prep;
+  const word = p.queue.shift();
+  const card = p.cards.get(word);
+  if (correct) {
+    card.step++;
+    if (card.step >= card.ladder.length) p.learned++;
+    else p.queue.push(word);
+  } else {
+    // Back one rung, which off the first drill rung means being shown the word
+    // again. Asking the same question twice in a row tests the last four
+    // seconds; dropping the whole ladder for one slip on the last rung throws
+    // away two answers he got right and makes the sitting feel punitive.
+    card.step = Math.max(0, card.step - 1);
+    p.queue.push(word);
+  }
+  paintPrep();
+}
+
+function renderPrepMeet(pad, item) {
+  const d = content.dict[item.word] || {};
+  pad.appendChild(el('p', 'label center', t('prepMeet')));
+
+  const card = el('div', 'wu-card open');
+  card.innerHTML =
+    `<span class="wu-word es">${esc(item.word)}</span>` +
+    `<span class="wu-pos">${esc([d.pos, d.g].filter(Boolean).join(' · '))}</span>` +
+    `<span class="wu-mean en">${esc(d.en || '')}</span>` +
+    `<span class="wu-note en${d.note ? ' has' : ''}">${esc(d.note || '')}</span>`;
+  pad.appendChild(card);
+
+  // Meeting a word is a real sighting and is recorded as one — this is the
+  // same event the reader logs, so the strength colour the word carries into
+  // the story is earned rather than decorative.
+  store.recordExposure(item.word);
+  if (canAudio()) { speech.warmUp(); speech.speak(item.word, speakOpts()); }
+
+  const go = el('button', 'go', t('prepGotIt'));
+  go.type = 'button';
+  go.addEventListener('click', () => prepAdvance(true));
+  pad.appendChild(go);
+}
+
+function renderPrepChoice(pad, item) {
+  pad.appendChild(el('p', 'label center',
+    item.kind === 'es_en' ? t('prepRecognise')
+      : item.kind === 'en_es' ? t('prepProduce') : t('prepGapPrompt')));
+
+  const prompt = el('div', 'gap-s');
+  if (item.kind === 'es_en') prompt.innerHTML = `<span class="es">${esc(item.word)}</span>`;
+  else if (item.kind === 'en_es') prompt.innerHTML = `<span class="en" style="font-size:20px">${esc(item.english)}</span>`;
+  else prompt.innerHTML = `<span class="es">${esc(item.sentence)}</span>`;
+  pad.appendChild(prompt);
+  if (item.translation) pad.appendChild(el('p', 'gap-e en', item.translation));
+
+  const choices = el('div', 'choices');
+  for (const opt of item.options) {
+    const b = el('button', 'ch', opt);
+    b.type = 'button';
+    if (item.kind === 'es_en') {
+      b.classList.add('en');
+      b.style.fontFamily = 'var(--sans)';
+      b.style.fontSize = '15px';
+    }
+    b.addEventListener('click', () => {
+      const right = opt === item.correct;
+      choices.querySelectorAll('.ch').forEach((c) => {
+        c.disabled = true;
+        if (c.textContent === item.correct && !right) c.classList.add('right');
+        else if (c !== b) c.classList.add('dim');
+      });
+      b.classList.add(right ? 'right' : 'wrongc');
+      store.recordAnswer(item.word, right);
+      activity();
+
+      const fb = el('div', `fb show ${right ? 'good' : 'bad'}`);
+      fb.innerHTML = `<b>${esc(right ? t('prepRight') : t('prepWrong'))}</b>` +
+        (right ? '' : `<span>${md(t('prepWas', { a: item.correct }))}</span>`);
+      pad.appendChild(fb);
+      // The word is said now rather than while the question is up: on the
+      // English prompt and on the gap, reading it aloud first is the answer.
+      if (canAudio()) { speech.warmUp(); speech.speak(item.word, speakOpts()); }
+
+      const go = el('button', 'go', t('prepNext'));
+      go.type = 'button';
+      go.addEventListener('click', () => prepAdvance(right));
+      pad.appendChild(go);
+    });
+    choices.appendChild(b);
+  }
+  pad.appendChild(choices);
+}
+
+function prepBatchEnd() {
+  const p = prep;
+  sync();
+  $('prepCount').textContent = `${p.learned} / ${p.batchSize}`;
+  $('prepProg').style.width = '100%';
+  $('prepSub').textContent = t('prepLeft', { n: p.remaining.length });
+  const pad = $('prepPad');
+  clear(pad);
+
+  const more = p.remaining.length;
+  const fb = el('div', 'fb show good');
+  fb.innerHTML = `<b>${esc(t('prepLabel'))}</b><span>${esc(more
+    ? t('prepBatchDone', { n: p.learned, r: more })
+    : t('prepAllDone'))}</span>`;
+  pad.appendChild(fb);
+
+  if (more) {
+    const keep = el('button', 'go', t('prepKeep', { n: Math.min(more, PREP_BATCH) }));
+    keep.type = 'button';
+    keep.addEventListener('click', prepBatch);
+    pad.appendChild(keep);
+  }
+
+  const start = el('button', more ? 'go ghost' : 'go jade', more ? t('prepStartAnyway') : t('prepStart'));
+  start.type = 'button';
+  // Straight into the reader. The warm-up is a lighter version of what he has
+  // just finished doing, and put between the two it is only a delay.
+  start.addEventListener('click', () => openReader(p.lesson));
+  pad.appendChild(start);
 }
 
 // ══ WARM-UP ═════════════════════════════════════════════════
@@ -1866,6 +2086,7 @@ function wire() {
   $('wuCard').addEventListener('click', revealWarmup);
   $('wuNext').addEventListener('click', advanceWarmup);
   $('wuClose').addEventListener('click', () => openReader(warm.lesson));
+  $('prepClose').addEventListener('click', () => { speech.stop(); showScreen('today'); renderToday(); });
   $('fluencyClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
   $('friendClose').addEventListener('click', () => { showScreen('today'); renderToday(); });
   $('mapBtn').addEventListener('click', () => { showScreen('map'); renderMap(); });

@@ -26,6 +26,34 @@ is almost never.
     reference/      the original single-file Flutter app, kept for reference
     scripts/        one-off build helpers
 
+## Before you read
+
+Today carries a card above the story card that owns the gap between you and the
+next story: every dictionary word that story uses which you are not holding
+yet, and a session that closes it.
+
+Each word gets four rungs — meet it, recognise it (Spanish → English), produce
+it (English → Spanish), then fill it into the line the story actually uses it
+in. The last one is the point: it is not a specimen sentence, it is the sentence
+you hit two minutes later. A wrong answer drops the word one rung, so a slip on
+the last rung costs one question rather than the whole ladder, and dropping off
+the first drill rung means being shown the word again.
+
+Six words at a time, met together and then told apart, because that is what has
+to happen anyway when they turn up in one paragraph. The card recomputes from
+the vocabulary on every render, so walking out halfway and coming back resumes
+by arithmetic — there is no session saved anywhere and none to go stale.
+
+`storyWords`, `unknownStoryWords`, `storyGap` and `prepLadder` in `engine.js`
+are the whole of it and are covered by the engine tests; `screens.js` only
+turns the ladder into screens. "Not holding yet" is `isKnown()` unchanged —
+the app's own bar, not a second one, because two screens disagreeing about
+what *known* means is worse than either answer.
+
+Labels come from the pack like every other one (`prepLabel`, `prepGap`,
+`prepGo`, …), so a course that ships none of them gets the English in
+`js/ui.js`.
+
 ## Checks
 
     node docs/js/engine.test.mjs

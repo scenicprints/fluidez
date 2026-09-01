@@ -618,6 +618,123 @@ export function generateExercises(vocab, dict, lessons, count = 12, modes = null
   return out;
 }
 
+// ── BEFORE A STORY ──────────────────────────────────────────
+// Reading a story you have no words for is not reading, it is decoding, and
+// decoding is what makes the reader feel like work. Everything below builds
+// the vocabulary of exactly one story: what it uses, what you are not holding
+// yet, and the passes that close the difference before the first line.
+//
+// This is deliberately not the warm-up. The warm-up shows the handful of words
+// the story hammers and asks nothing; this takes every word in the story you
+// cannot yet claim and does not let go of one until you have produced it.
+
+/**
+ * Every dictionary word this story uses, in the order it first appears.
+ *
+ * Resolved rather than spelled — "hablás" is hablar — so the list names the
+ * same memories the reader underlines and the scheduler counts, and a word
+ * written three ways is one entry. First appearance, because that is the
+ * order the story itself introduces them in.
+ */
+export function storyWords(lesson, resolveFn, verbs) {
+  const out = [];
+  const seen = new Set();
+  for (const sn of (lesson && lesson.sentences) || []) {
+    const toks = tokenize(sn.es);
+    const bound = separableBindings(toks, resolveFn, verbs);
+    toks.forEach((tok, i) => {
+      const key = bound.get(i) || (tok.isWord ? resolveFn(tok.raw) : null);
+      if (key && !seen.has(key)) { seen.add(key); out.push(key); }
+    });
+  }
+  return out;
+}
+
+/**
+ * The words in this story you are not holding yet.
+ *
+ * `isKnown` is the app's own bar and it is used here unchanged rather than
+ * given a stricter one of its own: a word met once passively sits at exactly
+ * 0.2 and slides under within the day, so a single sighting never counts as
+ * taught, and a word the rest of the app calls known is not re-taught here.
+ * Two screens disagreeing about what "known" means is worse than either bar.
+ */
+export function unknownStoryWords(lesson, vocab, dict, resolveFn, verbs, nowMs = Date.now()) {
+  return storyWords(lesson, resolveFn, verbs)
+    .filter((w) => dict[w] && !isKnown(memoryStrength(vocab[w] || {}, nowMs)));
+}
+
+/**
+ * The line this story actually uses the word in, with the word blanked out.
+ *
+ * Blanked by POSITION and rebuilt from the tokens, never by replacing a
+ * substring: "que" lives inside "querés" and "y" inside "Hay", and a string
+ * replace hollows out the wrong word — the same trap generateExercises() was
+ * caught by. Long lines are skipped; a gap you have to read a paragraph to
+ * fill is a reading test, not a vocabulary one.
+ */
+export function storyGap(word, lesson, resolveFn, verbs, maxWords = 14) {
+  for (const sn of (lesson && lesson.sentences) || []) {
+    const toks = tokenize(sn.es);
+    if (toks.filter((t) => t.isWord).length > maxWords) continue;
+    const bound = separableBindings(toks, resolveFn, verbs);
+    const at = toks.findIndex((tok, i) =>
+      (bound.get(i) || (tok.isWord ? resolveFn(tok.raw) : null)) === word);
+    if (at < 0) continue;
+    return {
+      sentence: toks.map((t, i) => (i === at ? ' ______ ' : t.raw)).join(''),
+      translation: sn.en,
+    };
+  }
+  return null;
+}
+
+/** The passes one word gets before its story, in the order they are asked. */
+export const PREP_STEPS = ['meet', 'es_en', 'en_es', 'gap'];
+
+/**
+ * One word's ladder: meet it, recognise it, produce it, then read it in the
+ * line the story uses it in.
+ *
+ * The last rung is the point. The sentence is not a specimen picked from the
+ * course, it is the sentence he is about to hit two minutes later, so clearing
+ * it is the same act as reading the story with the word already in hand. A
+ * word whose story gives no short enough line gets three rungs rather than a
+ * fabricated fourth.
+ *
+ * Distractors come from `near` — the other words being taught in the same
+ * sitting — before the dictionary. Those are the words actually about to be
+ * confused with each other; three drawn at random from 2,400 unrelated entries
+ * turn a four-way choice into a one-way one.
+ */
+export function prepLadder(word, lesson, dict, resolveFn, verbs, near = []) {
+  const entry = dict[word];
+  if (!entry) return [];
+  const sense = firstSense(entry.en);
+  const usable = (k) => k !== word && dict[k] && !SKIP_POS.includes(dict[k].pos)
+    && firstSense(dict[k].en) !== sense;
+  const nearPool = near.filter(usable);
+  const farPool = Object.keys(dict).filter((k) => usable(k) && !nearPool.includes(k));
+  // Fresh draw per rung: one set of distractors reused down the ladder teaches
+  // the shape of the answer rather than the word.
+  const others = (n = 3) => [...shuffle(nearPool), ...shuffle(farPool)].slice(0, n);
+
+  const steps = [
+    { kind: 'meet', word },
+    { kind: 'es_en', word, correct: sense, options: shuffle([sense, ...others().map((k) => firstSense(dict[k].en))]) },
+    { kind: 'en_es', word, english: sense, correct: word, options: shuffle([word, ...others()]) },
+  ];
+  const gap = storyGap(word, lesson, resolveFn, verbs);
+  if (gap) {
+    steps.push({
+      kind: 'gap', word, correct: word,
+      sentence: gap.sentence, translation: gap.translation,
+      options: shuffle([word, ...others()]),
+    });
+  }
+  return steps;
+}
+
 // ── ANSWER GRADING ──────────────────────────────────────────
 // Typed answers are compared forgivingly: case, punctuation and accents are
 // not what is being tested here, word choice and order are.
